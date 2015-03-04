@@ -17,10 +17,14 @@ import water.util.SB;
 //        1 bit  (128) right leaf type flag (0: subtree, 1: small cat, 2: big cat, 3: float)
 //    left, right: tree | prediction
 //    prediction: 4 bytes of float (or 1 or 2 bytes of class prediction)
-class CompressedTree extends Keyed {
+public class CompressedTree extends Keyed {
   final byte [] _bits;
   final int _nclass;            // Number of classes being predicted (for an integer prediction tree)
   final long _seed;
+  public CompressedTree( byte [] bits, int nclass, long seed ) {
+    super(Key.makeSystem("tree"+Key.rand()));
+    _bits = bits; _nclass = nclass; _seed = seed;
+  }
   public CompressedTree( byte[] bits, int nclass, long seed, int tid, int cls ) {
     super(Key.makeSystem("tree_"+tid+"_"+cls+"_"+Key.rand()));
     _bits = bits; _nclass = nclass; _seed = seed; 

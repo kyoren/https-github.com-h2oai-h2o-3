@@ -55,6 +55,7 @@ final public class Key<T extends Keyed> extends Iced<Key<T>> implements Comparab
   public static final byte VEC = 4; // Vec
   public static final byte CHK = 5; // Chunk
   public static final byte GRP = 6; // Vec.VectorGroup
+  public static final byte DFJ_INTERNAL_USER = 7;
 
   public static final byte HIDDEN_USER_KEY = 31;
   public static final byte USER_KEY = 32;
@@ -313,6 +314,16 @@ final public class Key<T extends Keyed> extends Iced<Key<T>> implements Comparab
    *  @return the desired Key   */
   public static Key make(byte rf, byte systemType, boolean hint, H2ONode... replicas) {
     return make(rand(),rf,systemType,hint,replicas);
+  }
+
+  // Make a particular system key that is homed to given node and possibly
+  // specifies also other 2 replicas. Works for both IPv4 and IPv6 addresses.
+  // If the addresses are not specified, returns a key with no home information.
+  static public Key make(String s, byte rf, byte systemType, H2ONode... replicas) {
+    return make(decodeKeyName(s),rf,systemType,false,replicas);
+  }
+  static public Key make(byte rf, byte systemType, H2ONode... replicas) {
+    return make(rand(),rf,systemType,replicas);
   }
 
 

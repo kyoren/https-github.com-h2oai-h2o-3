@@ -2,6 +2,7 @@ package water.util;
 
 import static java.lang.Double.isNaN;
 
+import java.text.DecimalFormat;
 import java.util.concurrent.TimeUnit;
 
 public class PrettyPrint {
@@ -113,5 +114,8 @@ public class PrettyPrint {
       s = String.format("%5.2f %%", 100 * pct);
     return s;
   }
+
+  public static String p2d(double d) { return !Double.isNaN(d) ? new DecimalFormat("0.##"   ).format(d) : "nan"; }
+  public static String p5d(double d) { return !Double.isNaN(d) ? new DecimalFormat ("0.#####").format(d) : "nan"; }
 
 }

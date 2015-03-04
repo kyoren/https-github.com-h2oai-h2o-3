@@ -303,6 +303,12 @@ public class ArrayUtils {
       if (ary[i]>result) result = ary[i];
     return result;
   }
+  public static int maxValue(byte[] from ) {
+    int result = from[0]&0xFF;
+    for (int i = 1; i < from.length; ++i)
+      if ( (from[i]&0xFF) > result) result = from[i]&0xFF;
+    return result;
+  }
   public static float minValue(float[] from) {
     float result = from[0];
     for (int i = 1; i<from.length; ++i)

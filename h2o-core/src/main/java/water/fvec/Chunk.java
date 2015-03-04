@@ -110,7 +110,7 @@ public void map( Chunk[] chks ) {                  // Map over a set of same-num
 
 public abstract class Chunk extends Iced implements Cloneable {
   /** Global starting row for this local Chunk; a read-only field. */
-  transient long _start = -1;
+  public transient long _start = -1;
   /** Global starting row for this local Chunk */
   public final long start() { return _start; }
   /** Global index of this chunk filled during chunk load */
@@ -180,7 +180,7 @@ public abstract class Chunk extends Iced implements Cloneable {
    *
    *  <p>Slightly slower than {@link #atd} since it range-checks within a chunk.
    *  @return double value at the given row, or NaN if the value is missing */
-  final double at_abs(long i) {
+  public final double at_abs(long i) {
     long x = i - (_start>0 ? _start : 0);
     if( 0 <= x && x < _len) return atd((int) x);
     throw new ArrayIndexOutOfBoundsException(""+_start+" <= "+i+" < "+(_start+ _len));

@@ -301,9 +301,9 @@ public final class Value extends Iced implements ForkJoinPool.ManagedBlocker {
     _rwlock = new AtomicInteger(0);
     _replicas = null;
   }
-  Value(Key k, byte[] mem ) { this(k, mem.length, mem, TypeMap.PRIM_B, ICE); }
+  public Value(Key k, byte[] mem ) { this(k, mem.length, mem, TypeMap.PRIM_B, ICE); }
   Value(Key k, String s ) { this(k, s.getBytes()); }
-  Value(Key k, Iced pojo ) { this(k,pojo,ICE); }
+  public Value(Key k, Iced pojo ) { this(k,pojo,ICE); }
   Value(Key k, Iced pojo, byte be ) {
     _key = k;
     _pojo = pojo;

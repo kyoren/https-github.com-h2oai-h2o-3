@@ -417,7 +417,7 @@ public final class AutoBuffer {
   //int zeros() { return _zeros; }
 
   public int position () { return _bb.position(); }
-  void position(int pos) { _bb.position(pos); }
+  public void position(int pos) { _bb.position(pos); }
   /** Skip over some bytes in the byte buffer.  Caller is responsible for not
    *  reading off end of the bytebuffer; generally this is easy for
    *  array-backed autobuffers and difficult for i/o-backed bytebuffers. */
@@ -621,7 +621,7 @@ public final class AutoBuffer {
 
   int    get1U(int off) { return _bb.get    (off)&0xFF; }
   int    get4 (int off) { return _bb.getInt (off); }
-  long   get8 (int off) { return _bb.getLong(off); }
+  public long   get8 (int off) { return _bb.getLong(off); }
 
   @SuppressWarnings("unused")  public AutoBuffer putZ (boolean b){ return put1(b?1:0); }
   @SuppressWarnings("unused")  public AutoBuffer put1 (   int b) { assert b >= -128 && b <= 255 : ""+b+" is not a byte";

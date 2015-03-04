@@ -259,7 +259,7 @@ public class Vec extends Keyed<Vec> {
   long chunk2StartElem( int cidx ) { return _espc[cidx]; }
 
   /** Number of rows in chunk. Does not fetch chunk content. */
-  private int chunkLen( int cidx ) { return (int) (_espc[cidx + 1] - _espc[cidx]); }
+  public int chunkLen( int cidx ) { return (int) (_espc[cidx + 1] - _espc[cidx]); }
 
   /** Check that row-layouts are compatible. */
   boolean checkCompatible( Vec v ) {
