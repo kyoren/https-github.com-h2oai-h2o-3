@@ -3,12 +3,14 @@ package hex.schemas;
 
 import hex.singlenoderf.Sampling;
 import hex.singlenoderf.SpeeDRF;
+import hex.singlenoderf.SpeeDRFModel;
 import hex.singlenoderf.Tree;
 import water.api.API;
+import water.api.SupervisedModelParametersSchema;
 
 public class SpeeDRFV2 extends SupervisedModelBuilderSchema<SpeeDRF,SpeeDRFV2,SpeeDRFV2.SpeeDRFParametersV2> {
 
-  public static final class SpeeDRFParametersV2 extends SupervisedModelParametersSchema<SpeeDRFParameters, SpeeDRFParametersV2> {
+  public static final class SpeeDRFParametersV2 extends SupervisedModelParametersSchema<SpeeDRFModel.SpeeDRFParameters, SpeeDRFParametersV2> {
     static public String[] own_fields = new String[] {
         "ntrees",
         "mtries",
