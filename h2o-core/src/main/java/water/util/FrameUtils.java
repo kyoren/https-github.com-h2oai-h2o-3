@@ -4,14 +4,13 @@ import java.io.*;
 import java.net.URI;
 import java.util.Random;
 
-import water.H2O;
-import water.Key;
-import water.MRTask;
+import hex.FrameSplitter;
+import jsr166y.CountedCompleter;
+import water.*;
 import water.fvec.Chunk;
 import water.fvec.Frame;
 import water.fvec.NFSFileVec;
 import water.parser.ParseDataset;
-import water.persist.Persist;
 
 public class FrameUtils {
 
@@ -73,17 +72,66 @@ public class FrameUtils {
   /**
    * Helper to insert missing values into a Frame
    */
-  public static class MissingInserter extends MRTask<MissingInserter> {
+  public static class MissingInserter extends Job<Frame> {
+    final Key _dataset;
+    final double _fraction;
     final long _seed;
-    final double _frac;
-    public MissingInserter(long seed, double frac){ _seed = seed; _frac = frac; }
 
-    @Override public void map (Chunk[]cs){
-      final Random rng = new Random();
-      for (int c = 0; c < cs.length; c++) {
-        for (int r = 0; r < cs[c]._len; r++) {
-          rng.setSeed(_seed + 1234 * c ^ 1723 * (cs[c].start() + r));
-          if (rng.nextDouble() < _frac) cs[c].setNA(r);
+    public MissingInserter(Key frame, long seed, double frac){
+      super(frame, "MissingValueInserter");
+      _dataset = frame; _seed = seed; _fraction = frac;
+    }
+
+    /**
+     * Driver for MissingInserter
+     */
+    class MissingInserterDriver extends H2O.H2OCountedCompleter {
+      final Frame _frame;
+      MissingInserterDriver(Frame frame) {_frame = frame; }
+      @Override
+      protected void compute2() {
+        new MRTask() {
+          @Override public void map (Chunk[]cs){
+            final Random rng = new Random();
+            for (int c = 0; c < cs.length; c++) {
+              for (int r = 0; r < cs[c]._len; r++) {
+                rng.setSeed(_seed + 1234 * c ^ 1723 * (cs[c].start() + r));
+                if (rng.nextDouble() < _fraction) cs[c].setNA(r);
+              }
+            }
+            update(1);
+          }
+        }.doAll(_frame);
+        tryComplete();
+      }
+
+      @Override
+      public void onCompletion(CountedCompleter caller){
+        done();
+      }
+
+      public boolean onExceptionalCompletion(Throwable ex, CountedCompleter cc) {
+        failed(ex);
+        return true;
+      }
+    }
+
+    public void execImpl() {
+      if (DKV.get(_dataset) == null)
+        throw new IllegalArgumentException("Invalid Frame key " + _dataset + " (Frame doesn't exist).");
+      if (_fraction < 0 || _fraction > 1 ) throw new IllegalArgumentException("fraction must be between 0 and 1.");
+      try {
+        final Frame frame = DKV.getGet(_dataset);
+        MissingInserterDriver mid = new MissingInserterDriver(frame);
+        int work = frame.vecs()[0].nChunks();
+        start(mid, work);
+      } catch (Throwable t) {
+        Job thisJob = DKV.getGet(_key);
+        if (thisJob._state == JobState.CANCELLED) {
+          Log.info("Job cancelled by user.");
+        } else {
+          failed(t);
+          throw t;
         }
       }
     }

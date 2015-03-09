@@ -6,7 +6,7 @@
 #'  H2O Methods:
 #'  ------------
 #'
-#'      h2o.ls, h2o.rm, h2o.assign, h2o.createFrame, h2o.splitFrame, h2o.ignoreColumns, h2o.cut, h2o.table
+#'      h2o.ls, h2o.rm, h2o.assign, h2o.createFrame, h2o.splitFrame, h2o.ignoreColumns, h2o.insertMissingValues, h2o.cut, h2o.table
 #'
 #'  Time & Date: '*' matches "Frame" and "ParsedData" --> indicates method dispatch via UseMethod
 #'  ------------
@@ -94,7 +94,6 @@ h2o.createFrame <- function(conn = h2o.getConnection(), key = "", rows = 10000, 
                             binary_ones_fraction = 0.02, missing_fraction = 0.01, response_factors = 2,
                             has_response = FALSE, seed) {
   if(!is(conn, "H2OConnection")) stop("`conn` must be an H2OConnection object")
-  .key.validate(key)
   if(!is.numeric(rows)) stop("`rows` must be a positive number")
   if(!is.numeric(cols)) stop("`cols` must be a positive number")
   if(!missing(seed) && !is.numeric(seed)) stop("`seed` must be a numeric value")
@@ -114,6 +113,9 @@ h2o.createFrame <- function(conn = h2o.getConnection(), key = "", rows = 10000, 
   .cframe.map <- c("key" = "dest")
   parms <- lapply(as.list(match.call(expand.dots = FALSE)[-1L]), eval.parent, 2)  # depth must be 2 in order to pop out of the lapply scope...
   parms$conn <- NULL
+  if(missing(key) || !is.character(key) || !nzchar(key)) 
+    parms$key = .key.make(conn, prefix = "frame")
+  .key.validate(parms$key)
   names(parms) <- lapply(names(parms), function(i) { if( i %in% names(.cframe.map) ) i <- .cframe.map[[i]]; i })
 
   res <- .h2o.__remoteSend(conn, .h2o.__CREATE_FRAME, method = "POST", .params = parms)
@@ -124,7 +126,36 @@ h2o.createFrame <- function(conn = h2o.getConnection(), key = "", rows = 10000, 
   h2o.getFrame(dest_key, conn)
 }
 
-h2o.splitFrame <- function(data, ratios = 0.75, destination_keys) {
+#' Inserting Missing Values to an H2O DataFrame
+#' 
+#' @section WARNING: This will modify the original dataset. Unless this is intended, 
+#' this function should only be called on a subset of the original.
+h2o.insertMissingValues <- function(data, fraction=0.1, seed) {
+  ## -- Force evaluate temporary ASTs -- ##
+  delete <- !.is.eval(data)
+  if (delete) {
+    temp_key <- data@key
+    .h2o.eval.frame(conn = data@conn, ast = data@mutable$ast, key = temp_key)
+  }
+
+  parms = list()
+  
+  parms$dataset <- data@key
+  parms$fraction <- fraction
+  if(!missing(seed))
+    parms$seed <- seed
+  
+  json <- .h2o.__remoteSend(conn = data@conn, method = "POST", page = 'MissingInserter.json', .params = parms)
+  # .h2o.__waitOnJob(data@conn, json$key$name)
+  # TODO: uncomment once job key progress is functional
+  res <- json$dataset$name
+
+  ## No gc because insertMissingValues modifies the frame in spot
+
+  h2o.getFrame(res)
+}
+
+h2o.splitFrame <- function(data, ratios = 0.75, destination_keys) {n
   if(!is(data, "H2OFrame")) stop("`data` must be an H2OFrame object")
   # if(!is.numeric(ratios) || length(ratios) == 0L || any(!is.finite(ratios) | ratios < 0 | ratios > 1))
   #   stop("`ratios` must be between 0 and 1 exclusive")
@@ -723,6 +754,27 @@ setMethod("length", "H2OFrame", function(x) {
 })
 
 #'
+#' Return the levels from the column requested column.
+#'
+#' @name h2o.levels
+#' @param x An \linkS4class{H2OFrame} object.
+#' @param i The index of the column whose domain is to be returned.
+#' @seealso \code{\link[base]{levels}} for the base R method.
+#' @examples
+#' localH2O <- h2o.init()
+#' iris.hex <- as.h2o(localH2O, iris)
+#' h2o.levels(iris.hex, 5)  # returns "setosa"     "versicolor" "virginica"
+NULL
+
+h2o.levels <- function(x, i) {
+  col_idx <- i
+  if (col_idx <= 0) col_idx <- 1
+  if (col_idx >= ncol(x)) col_idx <- ncol(x)
+  res <- .h2o.__remoteSend(x@conn, .h2o.__COL_DOMAIN(x@key, colnames(x)[col_idx]), method="GET")
+  res$domain[[1]]
+}
+
+#'
 #' Returns the Dimensions of a Parsed H2O Data Object.
 #'
 #' Returns the number of rows and columns for an \linkS4class{H2OFrame} object.
@@ -803,12 +855,6 @@ setMethod("tail", "H2OFrame", function(x, n = 6L, ...) {
 #' calling scope).
 #' @name LazyEval
 NULL
-
-#setMethod("levels", "H2OFrame", function(x) {
-#  if(ncol(x) != 1) return(NULL)
-#  res = .h2o.__remoteSend(x@conn, .h2o.__HACK_LEVELS2, source = x@key, max_ncols = .Machine$integer.max)
-#  res$levels[[1]]
-#})
 
 #'
 #' Is H2O Data Frame column a enum

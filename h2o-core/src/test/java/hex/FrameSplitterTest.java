@@ -2,18 +2,18 @@ package hex;
 
 import org.junit.Assert;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import water.H2O;
 import water.TestUtil;
 import water.fvec.Frame;
-import water.fvec.Vec;
-import water.parser.ValueString;
 import water.util.ArrayUtils;
 
+import static water.fvec.FrameTestUtil.assertValues;
 import static water.fvec.FrameTestUtil.createFrame;
 
 public class FrameSplitterTest extends TestUtil {
-  @BeforeClass() public static void setup() { stall_till_cloudsize(1); }
+  @BeforeClass() public static void setup() { stall_till_cloudsize(5); }
 
   @Test public void splitTinyFrame() {
     Frame   dataset = null;
@@ -57,6 +57,15 @@ public class FrameSplitterTest extends TestUtil {
     testScenario(fname, chunkLayout, data);
   }
 
+  @Test @Ignore
+  public void splitStringFramePUBDEV468() {
+    // NAs at the end of chunks
+    String fname = "test4.hex";
+    long[] chunkLayout = ar(3L, 3L);
+    String[][] data = ar(ar("A", null, "B"), ar("C", "D", "E"));
+    testScenario(fname, chunkLayout, data);
+  }
+
   /** Test scenario for splitting 1-vec frame of strings. */
   static void testScenario(String fname, long[] chunkLayout, String[][] data) {
     Frame f = createFrame(fname, chunkLayout, data);
@@ -84,16 +93,6 @@ public class FrameSplitterTest extends TestUtil {
       f.delete();
       if (splits!=null)
         for(Frame sf : splits) if (sf!=null) sf.delete();
-    }
-  }
-
-  static void assertValues(Frame f, String[] values) {
-    Assert.assertEquals("Number of rows", values.length, f.numRows());
-    Vec v = f.vec(0);
-    ValueString vs = new ValueString();
-    for (int i=0; i<f.numRows(); i++) {
-      if (v.isNA(i)) Assert.assertEquals("NAs should match", null, values[i]);
-      else Assert.assertEquals("Values should match", values[i], v.atStr(vs, i).toString());
     }
   }
 

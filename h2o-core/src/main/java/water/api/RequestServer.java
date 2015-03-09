@@ -23,6 +23,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import com.brsanthu.googleanalytics.AppViewHit;
 
 /**
  * This is a simple web server which accepts HTTP requests and routes them
@@ -93,8 +94,9 @@ public class RequestServer extends NanoHTTPD {
   static {
     // Data
 
-    addToNavbar(register("/2/CreateFrame","POST",CreateFrameHandler.class,"run"        ,"Something something something."),"/CreateFrame", "Create Frame",  "Data");
-    addToNavbar(register("/2/SplitFrame" ,"POST",SplitFrameHandler.class,"run"         ,"Something something something."),"/SplitFrame",  "Split Frame",   "Data");
+    addToNavbar(register("/2/CreateFrame","POST",CreateFrameHandler.class,"run"        ,"Create a synthetic H2O Frame."),"/CreateFrame", "Create Frame",  "Data");
+    addToNavbar(register("/2/SplitFrame" ,"POST",SplitFrameHandler.class,"run"         ,"Split a H2O Frame."),"/SplitFrame",  "Split Frame",   "Data");
+    addToNavbar(register("/2/MissingInserter" ,"POST",MissingInserterHandler.class,"run","Insert missing values."),"/MissingInserter",  "Insert Missing Values",   "Data");
     addToNavbar(register("/2/ImportFiles","GET",ImportFilesHandler.class,"importFiles" ,"Import raw data files into a single-column H2O Frame."), "/ImportFiles", "Import Files",  "Data");
     addToNavbar(register("/2/ParseSetup" ,"POST",ParseSetupHandler.class,"guessSetup"  ,"Guess the parameters for parsing raw byte-oriented data into an H2O Frame."),"/ParseSetup","ParseSetup",    "Data");
     addToNavbar(register("/2/Parse"      ,"POST",ParseHandler     .class,"parse"       ,"Parse a raw byte-oriented Frame into a useful columnar data Frame."),"/Parse"      , "Parse",         "Data"); // NOTE: prefer POST due to higher content limits
@@ -107,6 +109,7 @@ public class RequestServer extends NanoHTTPD {
     addToNavbar(register("/2/Timeline"   ,"GET",TimelineHandler   .class,"fetch"       ,"Something something something."),"/Timeline"   , "Timeline",      "Admin");
     addToNavbar(register("/2/Profiler"   ,"GET",ProfilerHandler   .class,"fetch"       ,"Something something something."),"/Profiler"   , "Profiler",      "Admin");
     addToNavbar(register("/2/JStack"     ,"GET",JStackHandler     .class,"fetch"       ,"Something something something."),"/JStack"     , "Stack Dump",    "Admin");
+    addToNavbar(register("/2/NetworkTest","GET",NetworkTestHandler.class,"fetch"       ,"Something something something."),"/NetworkTest", "NetworkTest",   "Admin");
     addToNavbar(register("/2/UnlockKeys" ,"GET",UnlockKeysHandler .class,"unlock"      ,"Unlock all keys in the H2O distributed K/V store, to attempt to recover from a crash."),"/UnlockKeys" , "Unlock Keys",   "Admin");
     addToNavbar(register("/2/Shutdown"   ,"POST",ShutdownHandler  .class,"shutdown"    ,"Shut down the cluster")         , "/Shutdown"  , "Shutdown",      "Admin");
 
@@ -148,6 +151,8 @@ public class RequestServer extends NanoHTTPD {
 
     register("/3/Frames/(?<key>.*)/columns/(?<column>.*)/summary","GET"   ,FramesHandler.class, "columnSummary", "columnSummaryDocs", new String[] {"key", "column"},
       "Return the summary metrics for a column, e.g. mins, maxes, mean, sigma, percentiles, etc.");
+    register("/3/Frames/(?<key>.*)/columns/(?<column>.*)/domain" ,"GET"   ,FramesHandler.class, "columnDomain",                       new String[] {"key", "column"},
+            "Return the domains for the specified column. \"null\" if the column is not an Enum.");
     register("/3/Frames/(?<key>.*)/columns/(?<column>.*)"        ,"GET"   ,FramesHandler.class, "column",                             new String[] {"key", "column"},
       "Return the specified column from a Frame.");
     register("/3/Frames/(?<key>.*)/columns"                      ,"GET"   ,FramesHandler.class, "columns",                            new String[] {"key"},
@@ -449,7 +454,7 @@ public class RequestServer extends NanoHTTPD {
   }
 
     // Log all requests except the overly common ones
-  void maybeLogRequest(String method, String uri, String pattern, Properties parms) {
+  void maybeLogRequest(String method, String uri, String pattern, Properties parms, Properties header) {
     if (uri.endsWith(".css")) return;
     if (uri.endsWith(".js")) return;
     if (uri.endsWith(".png")) return;
@@ -464,6 +469,11 @@ public class RequestServer extends NanoHTTPD {
 
     String paddedMethod = String.format("%-6s", method);
     Log.info("Method: " + paddedMethod, ", URI: " + uri + ", route: " + pattern + ", parms: " + parms);
+
+    if(header.getProperty("user-agent") != null)
+      H2O.GA.postAsync(new AppViewHit(uri).customDimention(H2O.CLIENT_TYPE_GA_CUST_DIM, header.getProperty("user-agent")));
+    else
+      H2O.GA.postAsync(new AppViewHit(uri));
   }
 
   private void capturePathParms(Properties parms, String path, Route route) {
@@ -543,7 +553,7 @@ public class RequestServer extends NanoHTTPD {
     try {
       // Handle any URLs that bypass the route approach.  This is stuff that has abnormal non-JSON response payloads.
       if (method.equals("GET") && uri.endsWith("/Logs/download")) {
-        maybeLogRequest(method, uri, "", parms);
+        maybeLogRequest(method, uri, "", parms, header);
         return downloadLogs();
       }
       if (method.equals("GET")) {
@@ -572,7 +582,7 @@ public class RequestServer extends NanoHTTPD {
         return wrapDownloadData(HTTP_OK, handle(type, route, version, parms));
       } else {
         capturePathParms(parms, versioned_path, route); // get any parameters like /Frames/<key>
-        maybeLogRequest(method, uri, route._url_pattern.pattern(), parms);
+        maybeLogRequest(method, uri, route._url_pattern.pattern(), parms, header);
         return wrap(handle(type,route,version,parms),type);
       }
     }
