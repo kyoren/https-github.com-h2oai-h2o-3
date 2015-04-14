@@ -52,7 +52,7 @@ public class DeepLearningReproducibilityTest extends TestUtil {
 
           p._train = train._key;
           p._valid = test._key;
-          p._destination_key = Key.make();
+          p._model_id = Key.make();
           p._response_column = train.names()[train.names().length-1];
           int ci = train.names().length-1;
           Scope.track(train.replace(ci, train.vecs()[ci].toEnum())._key);
@@ -81,7 +81,7 @@ public class DeepLearningReproducibilityTest extends TestUtil {
           }
 
           // Extract the scoring on validation set from the model
-          mymodel = DKV.getGet(p._destination_key);
+          mymodel = DKV.getGet(p._model_id);
           preds[repeat] = mymodel.score(test);
           Log.info("Prediction:\n" + FrameUtils.chunkSummary(preds[repeat]).toString());
           checksums[repeat] = mymodel.model_info().checksum_impl(); //check that the model state is consistent

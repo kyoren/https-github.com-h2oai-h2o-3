@@ -9,7 +9,6 @@ import org.junit.Test;
 import water.*;
 import water.fvec.Frame;
 import water.fvec.NFSFileVec;
-import water.fvec.Vec;
 import water.parser.ParseDataset;
 import water.rapids.Env;
 import water.rapids.Exec;
@@ -130,8 +129,8 @@ public class DeepLearningProstateTest extends TestUtil {
                                       {
                                         Log.info("Using seed: " + seed);
                                         DeepLearningParameters p = new DeepLearningParameters();
-                                        p._destination_key = Key.make(Key.make().toString() + "first");
-                                        dest_tmp = p._destination_key;
+                                        p._model_id = Key.make(Key.make().toString() + "first");
+                                        dest_tmp = p._model_id;
                                         p._checkpoint = null;
 
                                         p._train = frame._key;
@@ -194,8 +193,8 @@ public class DeepLearningProstateTest extends TestUtil {
                                       Assert.assertTrue(tmp_model.model_info().get_processed_total() >= frame.numRows() * epochs);
                                       assert (tmp_model != null);
 
-                                      p._destination_key = Key.make();
-                                      dest = p._destination_key;
+                                      p._model_id = Key.make();
+                                      dest = p._model_id;
                                       p._checkpoint = dest_tmp;
                                       // p._n_folds = 0;
 
