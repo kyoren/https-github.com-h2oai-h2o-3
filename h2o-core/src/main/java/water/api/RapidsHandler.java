@@ -38,9 +38,9 @@ class RapidsHandler extends Handler {
         Frame fr = env.popAry();
         Key[] keys = fr.keys();
         if(keys != null && keys.length > 0) {
-          rapids.vec_keys = new KeyV3.VecKeyV3[keys.length];
+          rapids.vec_ids = new KeyV3.VecKeyV3[keys.length];
           for (int i = 0; i < keys.length; i++)
-            rapids.vec_keys[i] = new KeyV3.VecKeyV3(keys[i]);
+            rapids.vec_ids[i] = new KeyV3.VecKeyV3(keys[i]);
         }
         if (fr.numRows() == 1 && fr.numCols() == 1) {
           rapids.key = new KeyV3.FrameKeyV3(fr._key);
