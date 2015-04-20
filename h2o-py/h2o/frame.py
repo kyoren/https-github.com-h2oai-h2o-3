@@ -576,7 +576,7 @@ class H2OFrame:
     j = h2o.frame(tmp_key)
     fr = j['frames'][0]       # Just the first (only) frame
     rows = fr['rows']         # Row count
-    veckeys = fr['vec_keys']  # List of h2o vec keys
+    veckeys = fr['vec_ids']  # List of h2o vec keys
     cols = fr['columns']      # List of columns
     colnames = [col['label'] for col in cols]
     return H2OFrame(vecs=H2OVec.new_vecs(zip(colnames, veckeys), rows))
