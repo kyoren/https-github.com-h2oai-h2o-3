@@ -18,7 +18,7 @@ public class FrameV3 extends Schema<Frame, FrameV3> {
 
   // Input fields
   @API(help="Key to inspect",required=true)
-  public FrameKeyV3 key;
+  public FrameKeyV3 frame_id;
 
   @API(help="Row offset to display",direction=API.Direction.INPUT)
   public long row_offset;
@@ -192,7 +192,7 @@ public class FrameV3 extends Schema<Frame, FrameV3> {
   public FrameV3() { super(); }
 
   /* Key-only constructor, for the times we only want to return the key. */
-  FrameV3(Key key) { this.key = new FrameKeyV3(key); }
+  FrameV3(Key frame_id) { this.frame_id = new FrameKeyV3(frame_id); }
 
   FrameV3(Frame fr) {
     this(fr, 1, (int)fr.numRows()); // NOTE: possible len truncation
@@ -202,7 +202,7 @@ public class FrameV3 extends Schema<Frame, FrameV3> {
   FrameV3(Frame fr, long off2, int len2) {
     if( off2==0 ) off2=1;       // 1-based row-numbering; so default offset is 1
     if( len2==0 ) len2=100;     // Default length if zero passed
-    key = new FrameKeyV3(fr._key);
+    frame_id = new FrameKeyV3(fr._key);
     _fr = fr;
     row_offset = off2-1;
     rows = fr.numRows();
@@ -235,7 +235,7 @@ public class FrameV3 extends Schema<Frame, FrameV3> {
   // Version&Schema-specific filling from the impl
   public FrameV3 fillFromImpl(Frame f, boolean force_summary) {
     this._fr = f;
-    this.key = new FrameKeyV3(f._key);
+    this.frame_id = new FrameKeyV3(f._key);
     this.checksum = _fr.checksum();
     row_offset = 0;
     rows = _fr.numRows();
@@ -268,6 +268,8 @@ public class FrameV3 extends Schema<Frame, FrameV3> {
     chunk_summary = new TwoDimTableV3().fillFromImpl(FrameUtils.chunkSummary(f).toTwoDimTable());
     return this;
   }
+
+
 
   public void clearBinsField() {
     for (ColV2 col: columns)
