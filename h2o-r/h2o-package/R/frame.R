@@ -458,7 +458,7 @@ h2o.setTimezone <- function(tz, conn=h2o.getConnection()) {
 h2o.getTimezone <- function(conn=h2o.getConnection()) {
   ast <- new("ASTNode", root = new("ASTApply", op = "getTimeZone"))
   mutable <- new("H2OFrameMutableState", ast = ast)
-  fr <- .newH2OObject("H2OFrame", conn = conn, key = .key.make(conn, "getTimeZone"), linkToGC = TRUE, mutable = mutable)
+  fr <- .newH2OFrame("H2OFrame", conn = conn, key = .key.make(conn, "getTimeZone"), linkToGC = TRUE, mutable = mutable)
   ret <- as.data.frame(fr)
   h2o.rm(fr@frame_id, fr@conn)
   ret
@@ -471,7 +471,7 @@ h2o.getTimezone <- function(conn=h2o.getConnection()) {
 h2o.listTimezones <- function(conn=h2o.getConnection()) {
   ast <- new("ASTNode", root = new("ASTApply", op = "listTimeZones"))
   mutable <- new("H2OFrameMutableState", ast = ast)
-  fr <- .newH2OObject("H2OFrame", conn = conn, key = .key.make(conn, "listTimeZones"), linkToGC = TRUE, mutable = mutable)
+  fr <- .newH2OFrame("H2OFrame", conn = conn, key = .key.make(conn, "listTimeZones"), linkToGC = TRUE, mutable = mutable)
   ret <- as.data.frame(fr)
   h2o.rm(fr@frame_id, fr@conn)
   ret
