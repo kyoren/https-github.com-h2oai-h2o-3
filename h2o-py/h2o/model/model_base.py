@@ -166,6 +166,16 @@ class ModelBase(object):
           break
       return self._metrics_class(raw_metrics,algo=self._model_json["algo"])
 
+  def score_history(self):
+    """
+    Retrieve Model Score History
+    :return: the score history (H2OTwoDimTable)
+    """
+    model = self._model_json["output"]
+    if 'scoring_history' in model.keys() and model["scoring_history"] != None: return model["scoring_history"]
+    else: print "No score history for this model"
+
+
   def summary(self):
     """
     Print a detailed summary of the model.
@@ -380,7 +390,7 @@ class ModelBase(object):
     tm = ModelBase._get_metrics(self,*ModelBase._train_or_valid(train, valid))
     if tm is None: return None
     tm = tm._metric_json
-    return tm.aic()
+    return tm["AIC"]
 
   def giniCoef(self, train=False, valid=False):
     """

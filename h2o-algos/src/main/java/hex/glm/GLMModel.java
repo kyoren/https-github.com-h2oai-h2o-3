@@ -76,7 +76,7 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     public boolean _use_all_factor_levels = false;
     public int _max_iterations = -1;
     public int _n_folds;
-    boolean _intercept = true;
+    public boolean _intercept = true;
     public double _beta_epsilon = 1e-4;
     public double _objective_epsilon = 1e-5;
     public double _gradient_epsilon = 1e-4;
@@ -696,6 +696,10 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     final double [] b = beta();
     final DataInfo dinfo = _output._dinfo;
     for(int i = 0; i < dinfo._cats; ++i) {
+      if(Double.isNaN(data[i])) {
+        eta = Double.NaN;
+        break;
+      }
       int ival = (int) data[i];
       if (ival != data[i]) throw new IllegalArgumentException("categorical value out of range");
       ival += dinfo._catOffsets[i];

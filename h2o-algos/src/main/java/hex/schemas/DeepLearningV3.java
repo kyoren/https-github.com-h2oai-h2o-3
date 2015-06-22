@@ -1,7 +1,7 @@
 package hex.schemas;
 
 import hex.deeplearning.DeepLearning;
-import hex.deeplearning.DeepLearningModel.DeepLearningParameters;
+import hex.deeplearning.DeepLearningParameters;
 import water.api.API;
 import water.api.FrameV3.ColSpecifierV3;
 import water.api.KeyV3.ModelKeyV3;
@@ -16,6 +16,8 @@ public class DeepLearningV3 extends ModelBuilderSchema<DeepLearning,DeepLearning
 //        "n_folds",
 //        "keep_cross_validation_splits",
         "response_column",
+        "weights_column",
+        "offset_column",
         "balance_classes",
         "class_sampling_factors",
         "max_after_balance_size",
@@ -71,7 +73,10 @@ public class DeepLearningV3 extends ModelBuilderSchema<DeepLearning,DeepLearning
         "sparsity_beta",
         "max_categorical_features",
         "reproducible",
-        "export_weights_and_biases"
+        "export_weights_and_biases",
+//        "elastic_averaging",
+//        "elastic_averaging_moving_rate",
+//        "elastic_averaging_regularization"
     };
 
     /// Supervised params
@@ -80,6 +85,13 @@ public class DeepLearningV3 extends ModelBuilderSchema<DeepLearning,DeepLearning
     // column names are related to training_frame.
     @API(help = "Response column", is_member_of_frames = {"training_frame", "validation_frame"}, is_mutually_exclusive_with = {"ignored_columns"}, direction = API.Direction.INOUT)
     public ColSpecifierV3 response_column;
+
+    // todo move this up in the hierarchy when there is weights support?
+    @API(help = "Column with observation weights", is_member_of_frames = {"training_frame", "validation_frame"}, is_mutually_exclusive_with = {"ignored_columns","response_column"}, direction = API.Direction.INOUT)
+    public ColSpecifierV3 weights_column;
+
+    @API(help = "Offset column", is_member_of_frames = {"training_frame", "validation_frame"}, is_mutually_exclusive_with = {"ignored_columns","response_column", "weights_column"}, direction = API.Direction.INOUT)
+    public ColSpecifierV3 offset_column;
 
   /*Imbalanced Classes*/
     /**
@@ -535,5 +547,14 @@ public class DeepLearningV3 extends ModelBuilderSchema<DeepLearning,DeepLearning
 
     @API(help = "Whether to export Neural Network weights and biases to H2O Frames", level = API.Level.expert, direction=API.Direction.INOUT)
     public boolean export_weights_and_biases;
+
+//    @API(help = "Elastic averaging between compute nodes can improve distributed model convergence", level = API.Level.expert, direction=API.Direction.INOUT)
+//    public boolean elastic_averaging;
+//
+//    @API(help = "Elastic averaging moving rate (only if elastic averaging is enabled).", level = API.Level.expert, direction=API.Direction.INOUT)
+//    public double elastic_averaging_moving_rate;
+//
+//    @API(help = "Elastic averaging regularization strength (only if elastic averaging is enabled).", level = API.Level.expert, direction=API.Direction.INOUT)
+//    public double elastic_averaging_regularization;
   }
 }
