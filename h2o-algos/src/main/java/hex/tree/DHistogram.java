@@ -41,7 +41,7 @@ public abstract class DHistogram<TDH extends DHistogram> extends Iced {
   public final char  _nbin;     // Bin count
   public final float _step;     // Linear interpolation step per bin
   public final float _min, _maxEx; // Conservative Min/Max over whole collection.  _maxEx is Exclusive.
-  public      double _bins[];   // Bins, shared, atomically incremented
+  public      float _bins[];   // Bins, shared, atomically incremented
 
   // Atomically updated float min/max
   protected    float  _min2, _maxIn; // Min/Max, shared, atomically updated.  _maxIn is Inclusive.
@@ -114,7 +114,7 @@ public abstract class DHistogram<TDH extends DHistogram> extends Iced {
   float binAt( int b ) { return _min+b/_step; }
 
   public int nbins() { return _nbin; }
-  public double bins(int b) { return _bins[b]; }
+  public float bins(int b) { return _bins[b]; }
   abstract public double mean(int b);
   abstract public double var (int b);
 
@@ -122,18 +122,18 @@ public abstract class DHistogram<TDH extends DHistogram> extends Iced {
   abstract void init0();
   final void init() {
     assert _bins == null;
-    _bins = MemoryManager.malloc8d(_nbin);
+    _bins = MemoryManager.malloc4f(_nbin);
     init0();
   }
 
   // Add one row to a bin found via simple linear interpolation.
   // Compute bin min/max.
   // Compute response mean & variance.
-  abstract void incr0( int b, double y, double w );
-  final void incr( float col_data, double y, double w ) {
+  abstract void incr0( int b, float y, float w );
+  final void incr( float col_data, float y, float w ) {
     assert Float.isNaN(col_data) || Float.isInfinite(col_data) || (_min <= col_data && col_data < _maxEx) : "col_data "+col_data+" out of range "+this;
     int b = bin(col_data);      // Compute bin# via linear interpolation
-    water.util.AtomicUtils.DoubleArray.add(_bins,b,w); // Bump count in bin
+    water.util.AtomicUtils.FloatArray.add(_bins,b,w); // Bump count in bin
     // Track actual lower/upper bound per-bin
     if (!Float.isInfinite(col_data)) {
       setMin(col_data);

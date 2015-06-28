@@ -168,7 +168,7 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
         for( int col : sCols ) { // For tracked cols
           double w = weight.atd(row);
           assert (w > 0.0);
-          nhs[col].incr((float) chks[col].atd(row), wrks.atd(row), w); // Histogram row/col
+          nhs[col].incr((float) chks[col].atd(row), (float)wrks.atd(row), (float)w); // Histogram row/col
         }
       }
     }
@@ -203,9 +203,9 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
     final DHistogram hcs[][] = _hcs;
     if( hcs.length==0 ) return; // Unlikely fast cutout
     // Local temp arrays, no atomic updates.
-    double bins[] = new double[Math.max(_nbins, _nbins_cats)];
-    double sums[] = new double[Math.max(_nbins, _nbins_cats)];
-    double ssqs[] = new double[Math.max(_nbins, _nbins_cats)];
+    float bins[] = new float[Math.max(_nbins, _nbins_cats)];
+    float sums[] = new float[Math.max(_nbins, _nbins_cats)];
+    float ssqs[] = new float[Math.max(_nbins, _nbins_cats)];
     // For All Columns
     for( int c=0; c<_ncols; c++) { // for all columns
       Chunk chk = chks[c];
@@ -222,9 +222,9 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
         // the (few) splits) so it's safe to bin more; also categoricals want
         // to split one bin-per-level no matter how many levels).
         if( rh._bins.length >= bins.length ) { // Grow bins if needed
-          bins = new double[rh._bins.length];
-          sums = new double[rh._bins.length];
-          ssqs = new double[rh._bins.length];
+          bins = new float[rh._bins.length];
+          sums = new float[rh._bins.length];
+          ssqs = new float[rh._bins.length];
         }
 
         // Gather all the data for this set of rows, for 1 column and 1 split/NID
@@ -247,7 +247,7 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
         rh.setMin(min);       // Track actual lower/upper bound per-bin
         rh.setMax(max);
         for( int b=0; b<rh._bins.length; b++ ) { // Bump counts in bins
-          if( bins[b] != 0 ) { AtomicUtils.DoubleArray.add(rh._bins,b,bins[b]); bins[b]=0; }
+          if( bins[b] != 0 ) { AtomicUtils.FloatArray.add(rh._bins,b,bins[b]); bins[b]=0; }
           if( sums[b] != 0 ) { rh.incr1(b,sums[b],ssqs[b]); sums[b]=ssqs[b]=0; }
         }
       }

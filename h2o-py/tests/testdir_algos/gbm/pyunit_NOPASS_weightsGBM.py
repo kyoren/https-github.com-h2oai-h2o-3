@@ -8,11 +8,11 @@ def weights_check(ip,port):
     # Connect to h2o
     h2o.init(ip,port)
 
-    def check_same(data1, data2):
-        gbm1_regression = h2o.gbm(x=data1[2:20], y=data1[1])
-        gbm2_regression = h2o.gbm(x=data2[2:21], y=data2[1], weights_column="weights")
-        gbm1_binomial = h2o.gbm(x=data1[1:20], y=data1[0], distribution="bernoulli")
-        gbm2_binomial = h2o.gbm(x=data2[1:21], y=data2[0], weights_column="weights", distribution="bernoulli")
+    def check_same(data1, data2, min_rows_scale):
+        gbm1_regression = h2o.gbm(x=data1[2:20], y=data1[1], min_rows=5)
+        gbm2_regression = h2o.gbm(x=data2[2:21], y=data2[1], weights_column="weights", min_rows=5*min_rows_scale)
+        gbm1_binomial = h2o.gbm(x=data1[1:20], y=data1[0], distribution="bernoulli", min_rows=5)
+        gbm2_binomial = h2o.gbm(x=data2[1:21], y=data2[0], weights_column="weights", distribution="bernoulli", min_rows=5*min_rows_scale)
 
         assert abs(gbm1_regression.mse() - gbm2_regression.mse()) < 1e-6, "Expected mse's to be the same, but got {0}, " \
                                                                           "and {1}".format(gbm1_regression.mse(),
@@ -32,7 +32,7 @@ def weights_check(ip,port):
 
     print "Checking that using uniform weights is equivalent to no weights:"
     print
-    check_same(h2o_data, h2o_data_uniform_weights)
+    check_same(h2o_data, h2o_data_uniform_weights, weight)
 
     # zero weights same as removed observations
     zero_weights = [[0] if random.randint(0,1) else [1] for r in range(100)]
@@ -43,7 +43,7 @@ def weights_check(ip,port):
 
     print "Checking that using some zero weights is equivalent to removing those observations:"
     print
-    check_same(h2o_data_zeros_removed, h2o_data_zero_weights)
+    #check_same(h2o_data_zeros_removed, h2o_data_zero_weights, 1)
 
     # doubled weights same as doubled observations
     doubled_weights = [[1] if random.randint(0,1) else [2] for r in range(100)]
@@ -58,7 +58,7 @@ def weights_check(ip,port):
 
     print "Checking that doubling some weights is equivalent to doubling those observations:"
     print
-    check_same(h2o_data_doubled, h2o_data_doubled_weights)
+    check_same(h2o_data_doubled, h2o_data_doubled_weights, 1)
 
     # TODO: random weights
 

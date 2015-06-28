@@ -845,6 +845,38 @@ public class ArrayUtils {
       for (int i = 0; i < idxs.length; ++i) idxs[i] = d[i];
     }
   }
+  /**
+   * Sort an integer array of indices based on values
+   * Updates indices in place, keeps values the same
+   * @param idxs indices
+   * @param values values
+   */
+  public static void sort(final int[] idxs, final float[] values) {
+    sort(idxs, values, 50);
+  }
+  public static void sort(final int[] idxs, final float[] values, int cutoff) {
+    if (idxs.length < cutoff) {
+      //hand-rolled insertion sort
+      for (int i = 0; i < idxs.length; i++) {
+        for (int j = i; j > 0 && values[idxs[j - 1]] > values[idxs[j]]; j--) {
+          int tmp = idxs[j];
+          idxs[j] = idxs[j - 1];
+          idxs[j - 1] = tmp;
+        }
+      }
+    } else {
+      Integer[] d = new Integer[idxs.length];
+      for (int i = 0; i < idxs.length; ++i) d[i] = idxs[i];
+//      Arrays.parallelSort(d, new Comparator<Integer>() {
+      Arrays.sort(d, new Comparator<Integer>() {
+        @Override
+        public int compare(Integer x, Integer y) {
+          return values[x] < values[y] ? -1 : (values[x] > values[y] ? 1 : 0);
+        }
+      });
+      for (int i = 0; i < idxs.length; ++i) idxs[i] = d[i];
+    }
+  }
 
   public static double [] subtract (double [] a, double [] b) {
     double [] c = MemoryManager.malloc8d(a.length);

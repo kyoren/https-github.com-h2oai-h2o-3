@@ -547,11 +547,11 @@ public class GBMTest extends TestUtil {
         GBMModel.GBMParameters parms = new GBMModel.GBMParameters();
         parms._train = tfr._key;
         parms._response_column = "C55";
-        parms._nbins = 1000;
-        parms._ntrees = 1;
-        parms._max_depth = 8;
-        parms._learn_rate = 0.1f;
-        parms._min_rows = 10;
+        parms._nbins = 20;
+        parms._ntrees = 3;
+        parms._max_depth = 5;
+        parms._learn_rate = 0.2f;
+        parms._min_rows = 1;
 //        parms._distribution = Family.multinomial;
         parms._distribution = Family.gaussian;
 
