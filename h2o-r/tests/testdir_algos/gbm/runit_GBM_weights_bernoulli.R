@@ -52,23 +52,23 @@ test_weights_by_row_duplication <- function(conn) {
   
   expect_equal(hh1@model$training_metrics@metrics$MSE,
                hh2@model$training_metrics@metrics$MSE,
-               tolerance = 1e-6)
+               tolerance = 1e-4)
   expect_equal(hh1@model$training_metrics@metrics$AUC,
                hh2@model$training_metrics@metrics$AUC,
-               tolerance = 1e-6)
+               tolerance = 1e-4)
   expect_equal(hh1@model$training_metrics@metrics$logloss,
                hh2@model$training_metrics@metrics$logloss,
-               tolerance = 1e-6)
+               tolerance = 1e-4)
 
   expect_equal(hh1@model$validation_metrics@metrics$MSE,
                hh2@model$validation_metrics@metrics$MSE,
-               tolerance = 1e-6)
+               tolerance = 1e-4)
   expect_equal(hh1@model$validation_metrics@metrics$AUC,
                hh2@model$validation_metrics@metrics$AUC,
-               tolerance = 1e-6)
+               tolerance = 1e-4)
   expect_equal(hh1@model$validation_metrics@metrics$logloss,
                hh2@model$validation_metrics@metrics$logloss,
-               tolerance = 1e-6)
+               tolerance = 1e-4)
   
   testEnd()
 }
