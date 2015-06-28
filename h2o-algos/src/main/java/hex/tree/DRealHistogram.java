@@ -21,12 +21,12 @@ public class DRealHistogram extends DHistogram<DRealHistogram> {
 
   @Override public double mean(int b) {
     double n = _bins[b];
-    return n>0 ? _sums[b]/n : 0;
+    return n>0 ? (double)_sums[b]/n : 0;
   }
   @Override public double var (int b) {
     double n = _bins[b];
     if( n==0 ) return 0;
-    return (_ssqs[b] - _sums[b]*_sums[b]/n)/(n-1);
+    return ((double)_ssqs[b] - (double)_sums[b]*_sums[b]/n)/(n-1);
   }
 
   // Big allocation of arrays
