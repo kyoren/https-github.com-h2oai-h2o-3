@@ -24,7 +24,7 @@ test.splitframe.recursion <- function(conn) {
 
   rec_split(h2o.splitFrame(hex, 0.5)[[1]])
 
-  endTest()
+  testEnd()
 }
 
 doTest("Recursive Application of Split Frame", test.splitframe.recursion)
