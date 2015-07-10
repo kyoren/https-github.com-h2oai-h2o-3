@@ -218,7 +218,7 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
           actualNewP._epochs += previous.epoch_counter; //add new epochs to existing model
           Log.info("Adding " + String.format("%.3f", previous.epoch_counter) + " epochs from the checkpointed model.");
 
-          if (actualNewP.getNumFolds() != 0) {
+          if (actualNewP._nfolds != 0) {
             Log.info("Disabling cross-validation: Not supported when resuming training from a checkpoint.");
 
             H2O.unimpl("writing to n_folds field needs to be uncommented");
@@ -231,11 +231,16 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
       }
       trainModel(cp);
 
-      // clean up, but don't delete the model and the (last) model metrics
+      // clean up, but don't delete the model and the training/validation model metrics
       List<Key> keep = new ArrayList<>();
       keep.add(dest());
       keep.add(cp.model_info().data_info()._key);
-      if (cp._output._model_metrics.length != 0) keep.add(cp._output._model_metrics[cp._output._model_metrics.length-1]);
+      // Do not remove training metrics
+      keep.add(cp._output._training_metrics._key);
+      // And validation model metrics
+      if (cp._output._validation_metrics != null) {
+        keep.add(cp._output._validation_metrics._key);
+      }
       if (cp._output.weights != null && cp._output.biases != null) {
         for (Key k : Arrays.asList(cp._output.weights)) {
           keep.add(k);
@@ -352,7 +357,7 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
         while (model.doScoring(trainScoreFrame, validScoreFrame, self(), _progressKey, iteration));
 
         // replace the model with the best model so far (if it's better)
-        if (!isCancelledOrCrashed() && _parms._overwrite_with_best_model && model.actual_best_model_key != null && _parms.getNumFolds() == 0) {
+        if (!isCancelledOrCrashed() && _parms._overwrite_with_best_model && model.actual_best_model_key != null && _parms._nfolds == 0) {
           DeepLearningModel best_model = DKV.getGet(model.actual_best_model_key);
           if (best_model != null && best_model.error() < model.error() && Arrays.equals(best_model.model_info().units, model.model_info().units)) {
             if (!_parms._quiet_mode) {

@@ -74,9 +74,11 @@ public class KMeans extends ClusteringModelBuilder<KMeansModel,KMeansModel.KMean
     if( _parms._init == Initialization.User && _parms._user_points == null )
       error("_user_points","Must specify initial cluster centers");
     if( null != _parms._user_points ){ // Check dimensions of user-specified centers
-      if( _parms._user_points.get().numCols() != _train.numCols() ) {
+      Frame user_points = _parms._user_points.get();
+      if( user_points.numCols() != _train.numCols() ) {
         error("_user_points","The user-specified points must have the same number of columns (" + _train.numCols() + ") as the training observations");
-      }
+      } else if( user_points.numRows() != _parms._k)
+        error("_user_points","The number of rows in the user-specified points is not equal to k = " + _parms._k);
     }
     if (expensive && error_count() == 0) checkMemoryFootPrint();
   }
@@ -99,10 +101,11 @@ public class KMeans extends ClusteringModelBuilder<KMeansModel,KMeansModel.KMean
       Random rand = water.util.RandomUtils.getRNG(_parms._seed - 1);
       double centers[][];    // Cluster centers
       if( null != _parms._user_points ) { // User-specified starting points
-        int numCenters = _parms._k;
-        int numCols = _parms._user_points.get().numCols();
+        Frame user_points = _parms._user_points.get();
+        int numCenters = (int)user_points.numRows();
+        int numCols = user_points.numCols();
         centers = new double[numCenters][numCols];
-        Vec[] centersVecs = _parms._user_points.get().vecs();
+        Vec[] centersVecs = user_points.vecs();
         // Get the centers and standardize them if requested
         for (int r=0; r<numCenters; r++) {
           for (int c=0; c<numCols; c++){
@@ -405,16 +408,24 @@ public class KMeans extends ClusteringModelBuilder<KMeansModel,KMeansModel.KMean
   }
 
   static public TwoDimTable createCenterTable(KMeansModel.KMeansOutput output, boolean standardized) {
+    String name = standardized ? "Standardized Cluster Means" : "Cluster Means";
+    if(output._size == null || output._names == null || output._domains == null || output._centers_raw == null ||
+            (standardized && output._centers_std_raw == null)) {
+      TwoDimTable table = new TwoDimTable(name, null, new String[] {"1"}, new String[]{"C1"}, new String[]{"double"},
+              new String[]{"%f"}, "Centroid");
+      table.set(0,0,Double.NaN);
+      return table;
+    }
+
     String[] rowHeaders = new String[output._size.length];
     for(int i = 0; i < rowHeaders.length; i++)
       rowHeaders[i] = String.valueOf(i+1);
     String[] colTypes = new String[output._names.length];
     String[] colFormats = new String[output._names.length];
-    for (int i=0; i<output._domains.length; ++i) {
+    for (int i = 0; i < output._domains.length; ++i) {
       colTypes[i] = output._domains[i] == null ? "double" : "String";
       colFormats[i] = output._domains[i] == null ? "%f" : "%s";
     }
-    String name = standardized ? "Standardized Cluster Means" : "Cluster Means";
     TwoDimTable table = new TwoDimTable(name, null, rowHeaders, output._names, colTypes, colFormats, "Centroid");
 
     for (int j=0; j<output._domains.length; ++j) {

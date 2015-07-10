@@ -171,7 +171,9 @@ h2o.uploadFile <- function(path, conn = h2o.getConnection(), destination_frame =
 #'
 #' Load a saved H2O model from disk.
 #'
-#' @param path The path of the H2O Model to be imported.
+#' @param path The path of the H2O Model to be imported. For example, if the `dir` argument in h2o.saveModel was set to
+#'        "/Users/UserName/Desktop" then the `path` argument in h2o.loadModel should be set to something like
+#'        "/Users/UserName/Desktop/K-meansModel__a7cebf318ca5827185e209edf47c4052"
 #' @param conn an \linkS4class{H2OConnection} object containing the IP address
 #'        and port of the server running H2O.
 #' @return Returns a \linkS4class{H2OModel} object of the class corresponding to the type of model
@@ -199,7 +201,7 @@ h2o.loadModel <- function(path, conn = h2o.getConnection()) {
   if(!is.character(path) || length(path) != 1L || is.na(path) || !nzchar(path))
     stop("`path` must be a non-empty character string")
 
-  res <- .h2o.__remoteSend(conn, .h2o.__LOAD_MODEL, dir = path, method = "POST")$models[[1L]]
+  res <- .h2o.__remoteSend(conn, .h2o.__LOAD_MODEL, h2oRestApiVersion = 99, dir = path, method = "POST")$models[[1L]]
   res
   h2o.getModel(res$model_id$name, conn)
 }

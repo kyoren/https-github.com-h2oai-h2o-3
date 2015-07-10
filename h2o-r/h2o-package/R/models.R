@@ -47,6 +47,7 @@
     if( length(x_ignore) == 0L ) x_ignore <- ''
     return(list(x=x, y=y, x_i=x_i, x_ignore=x_ignore, y_i=y_i))
   } else {
+    x_ignore <- setdiff(cc, x)
     if( !missing(y) ) stop("`y` should not be specified for autoencoder=TRUE, remove `y` input")
     return(list(x=x,x_i=x_i,x_ignore=x_ignore))
   }
@@ -97,10 +98,10 @@
 
 
 
-.h2o.startModelJob <- function(conn = h2o.getConnection(), algo, params) {
+.h2o.startModelJob <- function(conn = h2o.getConnection(), algo, params, h2oRestApiVersion = .h2o.__REST_API_VERSION) {
   .key.validate(params$key)
   #---------- Force evaluate temporary ASTs ----------#
-  ALL_PARAMS <- .h2o.__remoteSend(conn, method = "GET", .h2o.__MODEL_BUILDERS(algo))$model_builders[[algo]]$parameters
+  ALL_PARAMS <- .h2o.__remoteSend(conn, method = "GET", .h2o.__MODEL_BUILDERS(algo), h2oRestApiVersion = h2oRestApiVersion)$model_builders[[algo]]$parameters
 
   params <- lapply(params, function(x) {if(is.integer(x)) x <- as.numeric(x); x})
   #---------- Check user parameter types ----------#
@@ -161,7 +162,7 @@
   })
 
   #---------- Validate parameters ----------#
-  validation <- .h2o.__remoteSend(conn, method = "POST", paste0(.h2o.__MODEL_BUILDERS(algo), "/parameters"), .params = param_values)
+  validation <- .h2o.__remoteSend(conn, method = "POST", paste0(.h2o.__MODEL_BUILDERS(algo), "/parameters"), .params = param_values, h2oRestApiVersion = h2oRestApiVersion)
   if(length(validation$messages) != 0L) {
     error <- lapply(validation$messages, function(i) {
       if( i$message_type == "ERROR" )
@@ -178,7 +179,7 @@
   }
 
   #---------- Build! ----------#
-  res <- .h2o.__remoteSend(conn, method = "POST", .h2o.__MODEL_BUILDERS(algo), .params = param_values)
+  res <- .h2o.__remoteSend(conn, method = "POST", .h2o.__MODEL_BUILDERS(algo), .params = param_values, h2oRestApiVersion = h2oRestApiVersion)
 
   job_key  <- res$job$key$name
   dest_key <- res$job$dest$name
@@ -186,7 +187,7 @@
   new("H2OModelFuture",conn=conn, job_key=job_key, model_id=dest_key)
 }
 
-.h2o.createModel <- function(conn = h2o.getConnection(), algo, params) {
+.h2o.createModel <- function(conn = h2o.getConnection(), algo, params, h2oRestApiVersion = .h2o.__REST_API_VERSION) {
  params$training_frame <- get("training_frame", parent.frame())
  tmp_train <- !.is.eval(params$training_frame)
  if( tmp_train ) {
@@ -203,7 +204,7 @@
     }
   }
 
-  h2o.getFutureModel(.h2o.startModelJob(conn, algo, params))
+  h2o.getFutureModel(.h2o.startModelJob(conn, algo, params, h2oRestApiVersion))
 }
 
 h2o.getFutureModel <- function(object) {
@@ -1209,8 +1210,8 @@ plot.H2OBinomialMetrics <- function(x, type = "roc", ...) {
     main <- paste(yaxis, "vs", xaxis)
     if( x@on_train ) main <- paste(main, "(on train)")
     else             main <- paste(main, "(on valid)")
-    plot(x@metrics$thresholds_and_metric_scores$fpr, x@metrics$thresholds_and_metric_scores$tpr, main = main, xlab = xaxis, ylab = yaxis, ylim=c(0,1), xlim=c(0,1), ...)
-    abline(0, 1, lty = 2)
+    graphics::plot(x@metrics$thresholds_and_metric_scores$fpr, x@metrics$thresholds_and_metric_scores$tpr, main = main, xlab = xaxis, ylab = yaxis, ylim=c(0,1), xlim=c(0,1), ...)
+    graphics::abline(0, 1, lty = 2)
   }
 }
 

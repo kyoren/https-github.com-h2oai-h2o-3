@@ -98,6 +98,12 @@ The best way to get started is to modify the core module or create a new module,
 
 Users of our Spark-compatible solution, Sparkling Water, should be aware that Sparkling Water is only supported with the latest version of H2O. For more information about Sparkling Water, refer to the following links. 
 
+Sparkling Water is versioned according to the Spark versioning: 
+
+- Use [Sparkling Water 1.2](http://h2o-release.s3.amazonaws.com/sparkling-water/rel-1.2/6/index.html) for Spark 1.2
+- Use [Sparkling Water 1.3](http://h2o-release.s3.amazonaws.com/sparkling-water/rel-1.3/7/index.html) for Spark 1.3+
+- Use [Sparkling Water 1.4](http://h2o-release.s3.amazonaws.com/sparkling-water/rel-1.4/3/index.html) for Spark 1.4
+
 ###Getting Started with Sparkling Water
 
 The following video provides step-by-step instructions on how to start H2O using Sparkling Water:

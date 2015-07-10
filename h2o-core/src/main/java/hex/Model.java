@@ -338,8 +338,8 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
       return ModelCategory.Unknown;
     }
 
-    // TODO: Needs to be Atomic update, not just synchronized
     public synchronized ModelMetrics addModelMetrics(ModelMetrics mm) {
+      DKV.put(mm);
       for( Key key : _model_metrics ) // Dup removal
         if( key==mm._key ) return mm;
       _model_metrics = Arrays.copyOf(_model_metrics, _model_metrics.length + 1);
@@ -470,7 +470,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
       if(vec == null && isOffset)
         throw new IllegalArgumentException("Test dataset is missing offset vector '" + offset + "'");
       if(vec == null && isWeights && computeMetrics)
-        throw new IllegalArgumentException("Test dataset is missing weights vector '" + weights + "'");
+        throw new IllegalArgumentException("Test dataset is missing weights vector '" + weights + "' (needed because a response was found and metrics are to be computed).");
       // If a training set column is missing in the validation set, complain and fill in with NAs.
       if( vec == null) {
         String str = "Validation set is missing training column "+names[i];
@@ -619,8 +619,8 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
     // Score the dataset, building the class distribution & predictions
     BigScore bs = new BigScore(domains[0],ncols,adaptFrm.means(),_output.hasWeights() && adaptFrm.find(_output.weightsName()) >= 0,computeMetrics).doAll(ncols,adaptFrm);
     if (computeMetrics)
-      bs._mb.makeModelMetrics(this,fr, isSupervised() ? adaptFrm.lastVec().sigma() : Double.NaN);
-    return bs.outputFrame((null == destination_key ? Key.make() : Key.make(destination_key)),names,domains);
+      bs._mb.makeModelMetrics(this, fr);
+    return bs.outputFrame((null == destination_key ? Key.make() : Key.make(destination_key)), names, domains);
   }
 
   private class BigScore extends MRTask<BigScore> {

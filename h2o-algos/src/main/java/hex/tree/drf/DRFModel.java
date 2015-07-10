@@ -12,7 +12,7 @@ public class DRFModel extends SharedTreeModel<DRFModel,DRFModel.DRFParameters,DR
   public static class DRFParameters extends SharedTreeModel.SharedTreeParameters {
     int _mtries = -1;
     float _sample_rate = 0.632f;
-    public boolean _binomial_double_trees = true;
+    public boolean _binomial_double_trees = false;
     public DRFParameters() {
       super();
       // Set DRF-specific defaults (can differ from SharedTreeModel's defaults)
@@ -39,19 +39,14 @@ public class DRFModel extends SharedTreeModel<DRFModel,DRFModel.DRFParameters,DR
     int N = _parms._ntrees;
     if (_output.nclasses() == 1) { // regression - compute avg over all trees
       preds[0] /= N;
-      return preds;
-    }
-    else { // classification
-      if (_output.nclasses() == 2 && !_parms._binomial_double_trees) {
+    } else { // classification
+      if (_output.nclasses() == 2 && binomialOpt()) {
         preds[1] /= N; //average probability
         preds[2] = 1. - preds[1];
       } else {
         double sum = MathUtils.sum(preds);
         if (sum > 0) MathUtils.div(preds, sum);
       }
-      if (_parms._balance_classes)
-        GenModel.correctProbabilities(preds, _output._priorClassDist, _output._modelClassDist);
-      preds[0] = hex.genmodel.GenModel.getPrediction(preds, data, defaultThreshold());
     }
     return preds;
   }
@@ -60,7 +55,7 @@ public class DRFModel extends SharedTreeModel<DRFModel,DRFModel.DRFParameters,DR
     if (_output.nclasses() == 1) { // Regression
       body.ip("preds[0] /= " + _output._ntrees + ";").nl();
     } else { // Classification
-      if( _output.nclasses()==2 && !_parms._binomial_double_trees) { // Kept the initial prediction for binomial
+      if( _output.nclasses()==2 && binomialOpt()) { // Kept the initial prediction for binomial
         body.ip("preds[1] /= " + _output._ntrees + ";").nl();
         body.ip("preds[2] = 1.0 - preds[1];").nl();
       } else {

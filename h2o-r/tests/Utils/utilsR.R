@@ -121,10 +121,14 @@ genDummyCols <- function(df, use_all_factor_levels = TRUE) {
       if(!use_all_factor_levels) levs <- levs[-1]
       paste(cname, levs, sep = ".") }, 
       df_fac, colnames(df)[which(sapply(df, is.factor))])
+    fac_nams <- as.vector(unlist(fac_nams))
     fac_range <- 1:ncol(df_fac_acm)
-    num_range <- (ncol(df_fac_acm)+1):ncol(DF)
     names(DF)[fac_range] <- fac_nams
-    names(DF)[num_range] <- colnames(df)[which(sapply(df, is.numeric))]
+    
+    if(ncol(NUM(df)) > 0) {
+      num_range <- (ncol(df_fac_acm)+1):ncol(DF)
+      names(DF)[num_range] <- colnames(df)[which(sapply(df, is.numeric))]
+    }
   }
   
   return(DF)
@@ -133,11 +137,15 @@ genDummyCols <- function(df, use_all_factor_levels = TRUE) {
 alignData <- function(df, center = FALSE, scale = FALSE, ignore_const_cols = TRUE, use_all_factor_levels = TRUE) {
   df.clone <- df
   is_num <- sapply(df.clone, is.numeric)
-  df.clone[,is_num] <- scale(df.clone[,is_num], center = center, scale = scale)
-  df.clone <- df.clone[, c(which(!is_num), which(is_num))]   # Move categorical column to front
-  if (ignore_const_cols) {
+  if(any(is_num)) {
+    df.clone[,is_num] <- scale(df.clone[,is_num], center = center, scale = scale)
+    df.clone <- df.clone[, c(which(!is_num), which(is_num))]   # Move categorical column to front
+  }
+  
+  if(ignore_const_cols) {
     is_const <- sapply(df.clone, function(z) { var(z, na.rm = TRUE) == 0 })
-    df.clone <- df.clone[,!is_const]
+    if(any(is_const))
+      df.clone <- df.clone[,!is_const]
   }
   genDummyCols(df.clone, use_all_factor_levels)
 }

@@ -4,9 +4,8 @@ import hex.schemas.ModelBuilderSchema;
 import water.*;
 import water.exceptions.H2OIllegalArgumentException;
 import water.exceptions.H2OKeyNotFoundArgumentException;
-import water.fvec.C0DChunk;
-import water.fvec.Frame;
-import water.fvec.Vec;
+import water.fvec.*;
+import water.util.FrameUtils;
 import water.util.Log;
 import water.util.MRUtils;
 import water.util.ReflectionUtils;
@@ -55,6 +54,21 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
   public Vec response(){return _response;}
   /** Validation response vector. */
   public Vec vresponse(){return _vresponse;}
+
+  /**
+   * Compute the (weighted) mean of the response (subtracting possible offset terms)
+   * @return mean
+   */
+  protected double responseMean() {
+    if (hasWeights() || hasOffset()) {
+      return new FrameUtils.WeightedMean().doAll(
+              _response,
+              hasWeights() ? _weights : _response.makeCon(1),
+              hasOffset() ? _offset : _response.makeCon(0)
+      ).weightedMean();
+    }
+    return _response.mean();
+  }
 
 
 
@@ -227,7 +241,7 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
     if(_parms._weights_column != null) {
       Vec w = _train.remove(_parms._weights_column);
       if(w == null)
-        error("_weights_column","Offset column '" + _parms._weights_column  + "' not found in the training frame");
+        error("_weights_column","Weights column '" + _parms._weights_column  + "' not found in the training frame");
       else {
         if(!w.isNumeric())
           error("_weights_column","Invalid weights column '" + _parms._weights_column  + "', weights must be numeric");
@@ -270,7 +284,6 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
     }
     return res;
   }
-
 
   protected  boolean ignoreStringColumns(){return true;}
 
@@ -391,10 +404,6 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
         hide("_max_after_balance_size", "Max after balance size is only applicable to classification problems.");
         hide("_max_confusion_matrix_size", "Max confusion matrix size is only applicable to classification problems.");
       }
-      else {
-        if (_offset != null && !this.getAlgo().equals("glm"))
-          error("_offset", "Offset only applies to regression and logistic regression.");
-      }
       if (_nclass <= 2) {
         hide("_max_hit_ratio_k", "Max K-value for hit ratio is only applicable to multi-class classification problems.");
         hide("_max_confusion_matrix_size", "Only for multi-class classification problems.");
@@ -403,6 +412,16 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
         hide("_max_after_balance_size", "Only used with balanced classes");
         hide("_class_sampling_factors", "Class sampling factors is only applicable if balancing classes.");
       }
+    }
+    else {
+      hide("_response_column", "Ignored for unsupervised methods.");
+      hide("_balance_classes", "Ignored for unsupervised methods.");
+      hide("_class_sampling_factors", "Ignored for unsupervised methods.");
+      hide("_max_after_balance_size", "Ignored for unsupervised methods.");
+      hide("_max_confusion_matrix_size", "Ignored for unsupervised methods.");
+      _response = null;
+      _vresponse = null;
+      _nclass = 1;
     }
 
     // Build the validation set to be compatible with the training set.
@@ -449,8 +468,6 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
         builder._messages = ModelBuilder.this._messages;
         return builder;
       }
-      // Run the onCancelled code synchronously, right now
-      @Override public void onSuccess( Job old ) { if( isCancelledOrCrashed() ) onCancelled(); }
     }.invoke(_key);
     }
 
@@ -530,4 +547,5 @@ abstract public class ModelBuilder<M extends Model<M,P,O>, P extends Model.Param
 
     @Override public String toString() { return message_type + " on field: " + field_name + ": " + message; }
   }
+
 }

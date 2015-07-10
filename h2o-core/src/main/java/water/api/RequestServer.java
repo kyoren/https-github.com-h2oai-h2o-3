@@ -1,6 +1,5 @@
 package water.api;
 
-import com.brsanthu.googleanalytics.ScreenViewHit;
 import water.*;
 import water.exceptions.*;
 import water.fvec.Frame;
@@ -15,8 +14,8 @@ import java.net.ServerSocket;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import com.google.code.regexp.Matcher;
+import com.google.code.regexp.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -59,6 +58,7 @@ public class RequestServer extends NanoHTTPD {
   public static final int H2O_REST_API_VERSION = 3;
 
   static public RequestServer SERVER;
+  private RequestServer() {}
   private RequestServer( ServerSocket socket ) throws IOException { super(socket,null); }
 
   private static final String _htmlTemplateFromFile = loadTemplate("/page.html");
@@ -69,8 +69,8 @@ public class RequestServer extends NanoHTTPD {
 
   // An array of regexs-over-URLs and handling Methods.
   // The list is searched in-order, first match gets dispatched.
-  private static final LinkedHashMap<Pattern,Route> _routes = new LinkedHashMap<>();   // explicit routes registered below
-  private static final LinkedHashMap<Pattern,Route> _fallbacks= new LinkedHashMap<>(); // routes that are version fallbacks (e.g., we asked for v5 but v2 is the latest)
+  private static final LinkedHashMap<java.util.regex.Pattern,Route> _routes = new LinkedHashMap<>();   // explicit routes registered below
+  private static final LinkedHashMap<java.util.regex.Pattern,Route> _fallbacks= new LinkedHashMap<>(); // routes that are version fallbacks (e.g., we asked for v5 but v2 is the latest)
   public static final int numRoutes() { return _routes.size(); }
   public static final Collection<Route> routes() { return _routes.values(); }
 
@@ -167,7 +167,7 @@ public class RequestServer extends NanoHTTPD {
       "Delete all Frames from the H2O distributed K/V store.");
     register("/3/Models/(?<modelid>.*)/preview"                      ,"GET"   ,ModelsHandler.class, "fetchPreview",                       new String[] {"model_id"},
       "Return potentially abridged model suitable for viewing in a browser (currently only used for java model code).");
-    register("/3/Models/(?<modelid>.*)"                              ,"GET"   ,ModelsHandler.class, "fetch",                              new String[] {"model_id"},
+    register("/3/Models/(?<modelid>.*?)(\\.java)?"                  ,"GET"   ,ModelsHandler.class, "fetch",                              new String[] {"model_id"},
       "Return the specified Model from the H2O distributed K/V store, optionally with the list of compatible Frames.");
     register("/3/Models"                                         ,"GET"   ,ModelsHandler.class, "list",
       "Return all Models from the H2O distributed K/V store.");
@@ -177,9 +177,9 @@ public class RequestServer extends NanoHTTPD {
       "Delete all Models from the H2O distributed K/V store.");
 
     // Model serialization - import/export calls
-    register("/3/Models.bin/(?<modelid>.*)"                        ,"POST"  ,ModelsHandler.class, "importModel",                            new String[] {"model_id"},
+    register("/99/Models.bin/(?<modelid>.*)"                        ,"POST"  ,ModelsHandler.class, "importModel",                            new String[] {"model_id"},
             "Import given binary model into H2O.");
-    register("/3/Models.bin/(?<modelid>.*)"                        ,"GET"   ,ModelsHandler.class, "exportModel",                            new String[] {"model_id"},
+    register("/99/Models.bin/(?<modelid>.*)"                        ,"GET"   ,ModelsHandler.class, "exportModel",                            new String[] {"model_id"},
             "Export given model.");
 
     register("/3/Configuration/ModelBuilders/visibility"         ,"POST"  ,ModelBuildersHandler.class, "setVisibility",
@@ -381,7 +381,7 @@ public class RequestServer extends NanoHTTPD {
     assert lookup(handler_method, uri_pattern_raw)==null; // Not shadowed
     Pattern uri_pattern = Pattern.compile(uri_pattern_raw);
     Route route = new Route(http_method, uri_pattern_raw, uri_pattern, summary, handler_class, meth, doc_meth, path_params, handler_factory);
-    _routes.put(uri_pattern, route);
+    _routes.put(uri_pattern.pattern(), route);
     return route;
   }
 
@@ -426,38 +426,21 @@ public class RequestServer extends NanoHTTPD {
       String fallback_route_uri = "/" + i + "/" + route_m.group(2);
       Pattern fallback_route_pattern = Pattern.compile(fallback_route_uri);
       Route generated = new Route(fallback._http_method, fallback_route_uri, fallback_route_pattern, fallback._summary, fallback._handler_class, fallback._handler_method, fallback._doc_method, fallback._path_params, fallback._handler_factory);
-      _fallbacks.put(fallback_route_pattern, generated);
+      _fallbacks.put(fallback_route_pattern.pattern(), generated);
     }
 
     // Better be there in the _fallbacks cache now!
     return lookup(http_method, uri);
   }
 
-
-  // Keep spinning until we get to launch the NanoHTTPD.  Launched in a
-  // seperate thread (I'm guessing here) so the startup process does not hang
-  // if the various web-port accesses causes Nano to hang on startup.
-  public static Runnable start() {
+  public static void finalizeRegistration() {
     Schema.registerAllSchemasIfNecessary();
-    Runnable run=new Runnable() {
-        @Override public void run()  {
-          while( true ) {
-            try {
-              // Try to get the NanoHTTP daemon started
-              synchronized(this) {
-                SERVER = new RequestServer(water.init.NetworkInit._apiSocket);
-                notifyAll();
-              }
-              break;
-            } catch( Exception ioe ) {
-              Log.err("Launching NanoHTTP server got ",ioe);
-              try { Thread.sleep(1000); } catch( InterruptedException ignore ) { } // prevent denial-of-service
-            }
-          }
-        }
-      };
-    new Thread(run, "Request Server launcher").start();
-    return run;
+
+    // Need a stub RequestServer to handle calls to serve() from Jetty.
+    // But no threads are started here anymore.
+    SERVER = new RequestServer();
+
+    H2O.getJetty().acceptRequests();
   }
 
   public static void alwaysLogRequest(String uri, String method, Properties parms) {
@@ -609,7 +592,7 @@ public class RequestServer extends NanoHTTPD {
         return wrapDownloadData(HTTP_OK, handle(type, route, version, parms));
       } else {
         capturePathParms(parms, versioned_path, route); // get any parameters like /Frames/<key>
-        logged = maybeLogRequest(method, uri, route._url_pattern.pattern(), parms, header);
+        logged = maybeLogRequest(method, uri, route._url_pattern.namedPattern(), parms, header);
         if (logged) GAUtils.logRequest(uri, header);
         Schema s = handle(type, route, version, parms);
         PojoUtils.filterFields(s, (String)parms.get("_include_fields"), (String)parms.get("_exclude_fields"));
@@ -715,7 +698,9 @@ public class RequestServer extends NanoHTTPD {
         throw H2O.fail("model key was found but model array is not length 1 (was " + mb.models.length + ")");
       }
       ModelSchema ms = (ModelSchema)mb.models[0];
-      return new Response(http_response_header, MIME_DEFAULT_BINARY, ms.toJava(mb.preview));
+      Response r = new Response(http_response_header, MIME_DEFAULT_BINARY, ms.toJava(mb.preview));
+      //r.addHeader("Content-Disposition", "attachment; filename=\"" + ms.model_id.key().toString() + ".java\"");
+      return r;
     case html: {
       RString html = new RString(_htmlTemplate);
       html.replace("CONTENTS", s.writeHTML(new water.util.DocGen.HTML()).toString());
@@ -856,13 +841,13 @@ public class RequestServer extends NanoHTTPD {
     }
     arl.add(new MenuItem(base_url, name));
     */
-    return route._url_pattern.pattern();
+    return route._url_pattern.namedPattern();
   }
 
   // Return URLs for things that want to appear Frame-inspection page
   static String[] frameChoices( int version, Frame fr ) {
     ArrayList<String> al = new ArrayList<>();
-    for( Pattern p : _routes.keySet() ) {
+    for( java.util.regex.Pattern p : _routes.keySet() ) {
       try {
         Method meth = _routes.get(p)._handler_method;
         Class clz0 = meth.getDeclaringClass();

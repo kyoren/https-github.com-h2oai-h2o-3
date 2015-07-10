@@ -34,14 +34,6 @@ public class ModelMetricsSupervised extends ModelMetrics {
       throw H2O.fail("Subclasses must implement perRow.");
     }
 
-    @Override public ModelMetrics makeModelMetrics(Model m, Frame f, double sigma) { return null; }
-  }
-
-  protected static double weightedSigma(Model m, Frame f, double sigma) {
-    Vec w = f.vec(m._output.weightsName());
-    Vec y = f.vec(m._output.responseName());
-    if (w != null && y != null)
-      return new FrameUtils.WeightedSigma().doAll(y, w).weightedSigma();
-    return sigma;
+    @Override public ModelMetrics makeModelMetrics(Model m, Frame f) { return null; }
   }
 }

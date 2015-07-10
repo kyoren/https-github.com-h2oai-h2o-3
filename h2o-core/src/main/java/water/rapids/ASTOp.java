@@ -249,6 +249,7 @@ public abstract class ASTOp extends AST {
 
     putPrefix(new ASTKappa());
     putPrefix(new ASTWhich());
+    putPrefix(new ASTWhichMax());
     putPrefix(new ASTMajorityVote());
 
 //    // Time series operations
@@ -510,7 +511,7 @@ class ASTasDate extends ASTUniPrefixOp {
           if( !c.isNA(i) ) {
             if( isStr ) date = c.atStr(vStr, i).toString();
             else        date = dom[(int)c.at8(i)];
-            nc.addNum(DateTime.parse(date,_fmt).getMillis());
+            nc.addNum(DateTime.parse(date,_fmt).getMillis(),0);
           } else nc.addNA();
         }
       }
@@ -563,7 +564,7 @@ class ASTToDate extends ASTUniPrefixOp {
           if( !c.isNA(i) ) {
             if( isStr ) date = c.atStr(vStr, i).toString();
             else        date = dom[(int)c.at8(i)];
-            nc.addNum(DateTime.parse(date,_fmt).getMillis());
+            nc.addNum(DateTime.parse(date,_fmt).getMillis(),0);
           } else nc.addNA();
         }
       }
@@ -1304,20 +1305,30 @@ abstract class ASTBinOp extends ASTUniOrBinOp {
 
     if( fr0!=null ) {
       if( fr0.numCols()==1 && fr0.numRows()==1 ) {
-        d0 = fr0.anyVec().at(0);
+        Vec v = fr0.anyVec();
+        if( v.isEnum() ) s0 = v.domain()[(int)v.at(0)];
+        else             d0 = v.at(0);
         fr0=null;
       }
     }
 
     if( fr1!=null ) {
       if( fr1.numCols()==1 && fr1.numRows()==1 ) {
-        d1= fr1.anyVec().at(0);
+        Vec v = fr1.anyVec();
+        if( v.isEnum() ) s1 = v.domain()[(int)v.at(0)];
+        else             d1 = v.at(0);
         fr1=null;
       }
     }
 
     // both were 1x1 frames on the stack...
-    if( (fr0==null && fr1==null) && (s0==null && s1==null) ) { env.poppush(2, new ValNum(op(d0, d1))); return; }
+    if( fr0==null && fr1==null ) {
+      if( s0==null && s1==null ) env.poppush(2, new ValNum(op(d0, d1)));
+      if( s0!=null && s1==null ) env.poppush(2, new ValNum(Double.valueOf(op(s0, d1))));
+      if( s0==null && s1!=null ) env.poppush(2, new ValNum(Double.valueOf(op(d0, s1))));
+      if( s0!=null && s1!=null ) env.poppush(2, new ValNum(Double.valueOf(op(s0, s1))));
+      return;
+    }
 
     final boolean lf = fr0 != null;
     final boolean rf = fr1 != null;
@@ -1896,7 +1907,7 @@ class ASTKappa extends ASTUniPrefixOp {
         _O[x][y]++;
       }
     }
-    @Override public void reduce(OMatrixTask t) { _O=ArrayUtils.add(_O, t._O); t._O=null; }
+    @Override public void reduce(OMatrixTask t) { _O=ArrayUtils.add(_O, t._O); _aHist=ArrayUtils.add(_aHist, t._aHist); _pHist=ArrayUtils.add(_pHist,t._pHist);  t._O=null; }
   }
 }
 
@@ -3189,6 +3200,12 @@ class ASTSetColNames extends ASTUniPrefixOp {
     AST cols = E.parse();
     if( cols instanceof ASTSpan )          _idxs = ((ASTSpan)cols).toArray();
     else if( cols instanceof ASTLongList ) _idxs = ((ASTLongList)cols)._l;
+    else if( cols instanceof ASTDoubleList) {
+      double[] d = ((ASTDoubleList)cols)._d;
+      _idxs=new long[d.length];
+      int i=0;
+      for(double dd:d) _idxs[i++] = (long)dd;
+    }
     else if( cols instanceof ASTNum )      _idxs = new long[]{(long)((ASTNum) cols).dbl()};
     else throw new IllegalArgumentException("Bad AST: Expected a span, llist, or number for the column indices. Got: " + cols.getClass());
 
@@ -3533,7 +3550,7 @@ class ASTMean extends ASTUniPrefixOp {
 
   @Override void apply(Env env) {
     if (env.isNum()) return;
-      Frame fr = env.popAry(); // get the frame w/o sub-reffing
+    Frame fr = env.popAry(); // get the frame w/o sub-reffing
     if (fr.numCols() > 1 && fr.numRows() > 1)
       throw new IllegalArgumentException("mean does not apply to multiple cols.");
     for (Vec v : fr.vecs()) if (v.isEnum())
@@ -3547,13 +3564,12 @@ class ASTMean extends ASTUniPrefixOp {
       }
       env.push(new ValNum(mean/rows));
     } else {
-      MeanNARMTask t = new MeanNARMTask(_narm).doAll(fr.anyVec()).getResult();
-      if (t._rowcnt == 0 || Double.isNaN(t._sum)) {
-        double ave = Double.NaN;
-        env.push(new ValNum(ave));
-      } else {
-        double ave = t._sum / t._rowcnt;
-        env.push(new ValNum(ave));
+      Vec v = fr.anyVec();
+      if( _narm || v.naCnt()==0 ) env.push(new ValNum(v.mean()));
+      else {
+        MeanNARMTask t = new MeanNARMTask(false).doAll(v);
+        if (t._rowcnt == 0 || Double.isNaN(t._sum)) env.push(new ValNum(Double.NaN));
+        else env.push(new ValNum(t._sum / t._rowcnt));
       }
     }
   }
@@ -4271,26 +4287,29 @@ class ASTLs extends ASTOp {
     ArrayList<String> domain = new ArrayList<>();
     Futures fs = new Futures();
     AppendableVec av = new AppendableVec(Vec.VectorGroup.VG_LEN1.addVec());
+    AppendableVec av2= new AppendableVec(Vec.VectorGroup.VG_LEN1.addVec());
     NewChunk keys = new NewChunk(av,0);
+    NewChunk szs  = new NewChunk(av2,0);
     int r = 0;
     for( Key key : KeySnapshot.globalSnapshot().keys()) {
       keys.addEnum(r++);
+      szs.addNum(getSize(key));
       domain.add(key.toString());
     }
     keys.close(fs);
+    szs.close(fs);
     Vec c0 = av.close(fs);   // c0 is the row index vec
+    Vec c1 = av2.close(fs);
     fs.blockForPending();
     String[] key_domain = new String[domain.size()];
     for (int i = 0; i < key_domain.length; ++i) key_domain[i] = domain.get(i);
     c0.setDomain(key_domain);
-    env.pushAry(new Frame(Key.make("h2o_ls"), new String[]{"key"}, new Vec[]{c0}));
+    env.pushAry(new Frame(Key.make("h2o_ls"), new String[]{"key", "byteSize"}, new Vec[]{c0,c1}));
   }
 
   private double getSize(Key k) {
-    return (double)(((Frame) k.get()).byteSize());
-//    if (k.isChunkKey()) return (double)((Chunk)DKV.get(k).get()).byteSize();
-//    if (k.isVec()) return (double)((Vec)DKV.get(k).get()).rollupStats()._size;
-//    return Double.NaN;
+    try { return (double) (((Frame) k.get()).byteSize()); }
+    catch (Exception e) { return Double.NaN; }
   }
 }
 
@@ -4326,9 +4345,7 @@ class ASTKeysLeaked extends ASTUniPrefixOp {
       for( Key k : H2O.localKeySet() ) {
         Value value = H2O.raw_get(k);
         // Ok to leak VectorGroups and the Jobs list
-        if( value.isVecGroup() || k == Job.LIST ||
-                // Also leave around all attempted Jobs for the Jobs list
-                (value.isJob() && value.<Job>get().isStopped()) )
+        if( !(value.isFrame() || value.isVec() || value.get() instanceof Chunk) )
           leaked_keys--;
         else {
           if( cnt++ < 10 )
@@ -4498,7 +4515,7 @@ class ASTCat extends ASTUniPrefixOp {
             long spLength = sp.length();
             // can read the whole span into the chunk
             if( sp.length() <= clen ) {
-              m = new Marker((byte)1,spIdx,sp._min,sp._max);
+              m = new Marker((byte)1,spIdx,sp._min,(long)sp._max);
               sp=null;
               spIdx++;
               spanOrDbl++;
@@ -4513,11 +4530,11 @@ class ASTCat extends ASTUniPrefixOp {
 
           // got a split span
           } else {
-            long leftInSpan = sp._max - splitPoint + 1;
+            long leftInSpan = (long)sp._max - splitPoint + 1;
 
             // can we fit the rest of the span into this chunk
             if( leftInSpan <= clen ) {
-              m = new Marker((byte)1,spIdx,splitPoint+1,sp._max);
+              m = new Marker((byte)1,spIdx,splitPoint+1,(long)sp._max);
               // advance pointers, null out split span
               sp = null;
               splitPoint=0;
@@ -4617,6 +4634,60 @@ class ASTWhich extends ASTUniPrefixOp {  // 1-based index
     out=new double[w.size()];
     for(int i=0;i<w.size();++i) out[i]=w.get(i);
     return out;
+  }
+}
+
+class ASTWhichMax extends ASTUniPrefixOp {  // 1-based index
+  ASTWhichMax() {super(null); }
+  @Override ASTWhichMax make() { return new ASTWhichMax(); }
+  @Override ASTWhichMax parse_impl(Exec E) {
+    AST condition = E.parse();
+    ASTWhichMax res = (ASTWhichMax)clone();
+    res._asts = new AST[]{condition};
+    return res;
+  }
+  @Override String opStr() { return "h2o.which.max"; }
+  @Override public void apply(Env e) {
+    Frame f=e.popAry();
+    if( f.numRows()==1 && f.numCols() > 1) {
+      int idx=0;
+      double max = -Double.MAX_VALUE;
+      for(int i=0;i<f.numCols();++i) {
+        double val=f.vecs()[i].at(0);
+        if( val > max ) {
+          max = val;
+          idx = i;
+        }
+      }
+      Futures fs = new Futures();
+      Key key = Vec.VectorGroup.VG_LEN1.addVecs(1)[0];
+      AppendableVec v = new AppendableVec(key);
+      NewChunk chunk = new NewChunk(v, 0);
+      chunk.addNum(idx+1,0);
+      chunk.close(0, fs);
+      Vec vec = v.close(fs);
+      fs.blockForPending();
+      Frame fr2 = new Frame(vec);
+      e.pushAry(fr2);
+      return;
+    }
+    Frame f2 = new MRTask() {
+      @Override public void map(Chunk[] c, NewChunk nc) {
+        for(int row=0;row<c[0]._len;++row) {
+          double max=-Double.MAX_VALUE;
+          int idx=0;
+          for(int col=0;col<c.length;++col) {
+            double val = c[col].atd(row);
+            if( val > max ) {
+              max = val;
+              idx = col;
+            }
+          }
+          nc.addNum(idx+1);
+        }
+      }
+    }.doAll(1,f).outputFrame();
+    e.pushAry(f2);
   }
 }
 

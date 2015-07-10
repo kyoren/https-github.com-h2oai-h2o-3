@@ -45,16 +45,16 @@ h2o.exportFile <- function(data, path, force = FALSE) {
 }
 
 #'
-#' Export a Model to HDFS
+#' Export a H2OFrame to HDFS
 #'
-#' Exports an \linkS4class{H2OModel} to HDFS.
+#' Exports an \linkS4class{H2OFrame} to HDFS.
 #'
-#' @param object an \linkS4class{H2OModel} class object.
-#' @param path The path to write the model to. Must include the driectory and
+#' @param data an \linkS4class{H2OFrame} class object.
+#' @param path The path to write the data to. Must include the driectory and
 #'        filename.
 #' @param force logical, indicates how to deal with files that already exist.
 #' @export
-h2o.exportHDFS <- function(object, path,force=FALSE) { h2o.exportFile(data,path,force) }
+h2o.exportHDFS <- function(data,path,force=FALSE) { h2o.exportFile(data,path,force) }
 
 #' Download H2O Data to Disk
 #'
@@ -152,7 +152,7 @@ h2o.saveModel <- function(object, dir="", name="", filename="", force=FALSE) {
   else
     path <- file.path(dir, name)
 
-  res <- .h2o.__remoteSend(object@conn, .h2o.__SAVE_MODEL(object@model_id), dir=path, force=force)
+  res <- .h2o.__remoteSend(object@conn, .h2o.__SAVE_MODEL(object@model_id), h2oRestApiVersion = 99, dir=path, force=force)
 
   # return the path
   res$dir

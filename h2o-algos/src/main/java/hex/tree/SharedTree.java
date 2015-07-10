@@ -75,10 +75,10 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
    *  the number of classes to predict on; validate a checkpoint.  */
   @Override public void init(boolean expensive) {
     super.init(expensive);
+    if(_parms._nfolds > 1)
+      error("_nfolds", "nfolds > 1 is not implemented.");
     _hasWeights = super.hasWeights();
     _hasOffset = super.hasOffset();
-    if (_hasOffset)
-      error("_offset_column", "Offsets are not yet supported for GBM/DRF.");
     if (H2O.ARGS.client && _parms._build_tree_one_node)
       error("_build_tree_one_node", "Cannot run on a single node in client mode");
     if(_vresponse != null)
@@ -108,9 +108,16 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
     if (_parms._nbins_cats <= 1) error ("_nbins_cats", "_nbins_cats must be > 1.");
     if (_parms._nbins_cats >= 1<<16) error ("_nbins_cats", "_nbins_cats must be < " + (1<<16));
     if (_parms._max_depth <= 0) error ("_max_depth", "_max_depth must be > 0.");
-    if (_parms._min_rows < 1) error ("_min_rows", "_min_rows must be >= 1.");
-    if (_train != null && _train.numRows() < _parms._min_rows*2 ) // Need at least 2xmin_rows to split even once
-      error("_min_rows", "The dataset size is too small to split for min_rows=" + _parms._min_rows + " , number of rows: " + _train.numRows() + " < 2*" + _parms._min_rows);
+    if (_parms._min_rows <=0) error ("_min_rows", "_min_rows must be > 0.");
+    if (_parms._distribution == Distributions.Family.tweedie) {
+      _parms._distribution.tweedie.p = _parms._tweedie_power;
+    }
+    if (_train != null) {
+      double sumWeights = _train.numRows() * (hasWeights() ? _train.vec(_parms._weights_column).mean() : 1);
+      if (sumWeights < 2*_parms._min_rows ) // Need at least 2*min_rows weighted rows to split even once
+      error("_min_rows", "The dataset size is too small to split for min_rows=" + _parms._min_rows
+              + ": must have at least " + 2*_parms._min_rows + " (weighted) rows, but have only " + sumWeights + ".");
+    }
     if( _train != null )
       _ncols = _train.numCols()-1-(_parms._weights_column!=null?1:0)-(_parms._offset_column!=null?1:0);
   }
@@ -119,7 +126,6 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
   // Top-level tree-algo driver
   abstract protected class Driver extends H2OCountedCompleter<Driver> {
 
-    // Top-level tree-algo driver function
     @Override protected void compute2() {
       _model = null;            // Resulting model!
       try {
@@ -257,7 +263,7 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
       if (idx_weight() >= 0)
         fr2.add(fr._names[idx_weight()],vecs[idx_weight()]);
       // Start building one of the K trees in parallel
-      H2O.submitTask(sb1ts[k] = new ScoreBuildOneTree(this,k,nbins, nbins_cats, tree, leafs, hcs, fr2, subset, build_tree_one_node, _improvPerVar));
+      H2O.submitTask(sb1ts[k] = new ScoreBuildOneTree(this,k,nbins, nbins_cats, tree, leafs, hcs, fr2, subset, build_tree_one_node, _improvPerVar, _model._parms._distribution));
     }
     // Block for all K trees to complete.
     boolean did_split=false;
@@ -283,9 +289,10 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
     final boolean _subset;      // True if working a subset of cols
     final boolean _build_tree_one_node;
     float[] _improvPerVar;      // Squared Error improvement per variable per split
+    Distributions.Family _family;
     
     boolean _did_split;
-    ScoreBuildOneTree(SharedTree st, int k, int nbins, int nbins_cats, DTree tree, int leafs[], DHistogram hcs[][][], Frame fr2, boolean subset, boolean build_tree_one_node, float[] improvPerVar) {
+    ScoreBuildOneTree(SharedTree st, int k, int nbins, int nbins_cats, DTree tree, int leafs[], DHistogram hcs[][][], Frame fr2, boolean subset, boolean build_tree_one_node, float[] improvPerVar, Distributions.Family family) {
       _st   = st;
       _k    = k;
       _nbins= nbins;
@@ -297,6 +304,7 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
       _subset = subset;
       _build_tree_one_node = build_tree_one_node;
       _improvPerVar = improvPerVar;
+      _family = family;
     }
     @Override public void compute2() {
       // Fuse 2 conceptual passes into one:
@@ -307,7 +315,7 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
       // Pass 2: Build new summary DHistograms on the new child Nodes every row
       // got assigned into.  Collect counts, mean, variance, min, max per bin,
       // per column.
-      new ScoreBuildHistogram(this,_k, _st._ncols, _nbins, _nbins_cats, _tree, _leafs[_k], _hcs[_k], _subset).dfork(0,_fr2,_build_tree_one_node);
+      new ScoreBuildHistogram(this,_k, _st._ncols, _nbins, _nbins_cats, _tree, _leafs[_k], _hcs[_k], _subset, _family).dfork(0,_fr2,_build_tree_one_node);
     }
     @Override public void onCompletion(CountedCompleter caller) {
       ScoreBuildHistogram sbh = (ScoreBuildHistogram)caller;
@@ -345,9 +353,9 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
   protected int idx_offset(   ) { return _model._output.offsetIdx(); }
   protected int idx_resp(     ) { return _model._output.responseIdx(); }
   protected int idx_tree(int c) { return _ncols+1+c+(hasOffset()?1:0)+(hasWeights()?1:0); }
-  protected int idx_work(int c) { return _ncols+1+_nclass+c+(hasOffset()?1:0)+(hasWeights()?1:0); }
-  protected int idx_nids(int c) { return _ncols+1+_nclass+_nclass+c+(hasOffset()?1:0)+(hasWeights()?1:0); }
-  protected int idx_oobt(     ) { return _ncols+1+_nclass+_nclass+_nclass+(hasOffset()?1:0)+(hasWeights()?1:0); }
+  protected int idx_work(int c) { return idx_tree(c) + _nclass; }
+  protected int idx_nids(int c) { return idx_work(c) + _nclass; }
+  protected int idx_oobt()      { return idx_nids(0) + _nclass; }
 
   protected Chunk chk_weight( Chunk chks[]      ) { return chks[idx_weight()]; }
   protected Chunk chk_offset( Chunk chks[]      ) { return chks[idx_offset()]; }
@@ -381,7 +389,7 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
   void score2(Chunk chks[], double weight, double offset, double fs[/*nclass*/], int row ) {
     double sum = score1(chks, weight, offset, fs, row);
     if( isClassifier()) {
-      if( !Double.isInfinite(sum) && sum>0f ) ArrayUtils.div(fs, sum);
+      if( !Double.isInfinite(sum) && sum>0f && sum!=1f) ArrayUtils.div(fs, sum);
       if (_parms._balance_classes)
         GenModel.correctProbabilities(fs, _model._output._priorClassDist, _model._output._modelClassDist);
     }
@@ -429,7 +437,7 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
       // Score on training data
       new ProgressUpdate("Scoring the model.").fork(_progressKey);
       Score sc = new Score(this,true,oob,_model._output.getModelCategory()).doAll(train(), build_tree_one_node);
-      ModelMetrics mm = sc.makeModelMetrics(_model, _parms.train(), _parms._response_column);
+      ModelMetrics mm = sc.makeModelMetrics(_model, _parms.train());
       out._training_metrics = mm;
       if (oob) out._training_metrics._description = "Metrics reported on Out-Of-Bag training samples";
       out._scored_train[out._ntrees].fillFrom(mm);
@@ -438,7 +446,7 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
       // Score again on validation data
       if( _parms._valid != null ) {
         Score scv = new Score(this,false,false,_model._output.getModelCategory()).doAll(valid(), build_tree_one_node);
-        ModelMetrics mmv = scv.makeModelMetrics(_model,_parms.valid(), _parms._response_column);
+        ModelMetrics mmv = scv.makeModelMetrics(_model,_parms.valid());
         out._validation_metrics = mmv;
         out._scored_valid[out._ntrees].fillFrom(mmv);
         if (out._ntrees > 0) Log.info("Validation " + out._scored_valid[out._ntrees].toString());
@@ -463,7 +471,6 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
           Log.info("Confusion Matrix is too large (max_confusion_matrix_size=" + _parms._max_confusion_matrix_size
                   + "): " + _nclass + " classes.");
         }
-        Log.info((_nclass > 1 ? "Total of " + cm.errCount() + " errors" : "Reported") + " on " + cm.totalRows() + " rows");
       }
       _timeLastScoreEnd = System.currentTimeMillis();
     }
@@ -480,7 +487,7 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
     for( DTree dtree : trees )
       if( dtree != null ) {
         try {
-          PrintWriter writer = new PrintWriter("/tmp/h2o-dev.tree" + ++counter + ".txt", "UTF-8");
+          PrintWriter writer = new PrintWriter("/tmp/h2o-3.tree" + ++counter + ".txt", "UTF-8");
           writer.println(dtree.root().toString2(new StringBuilder(), 0));
           writer.close();
         } catch (FileNotFoundException|UnsupportedEncodingException e) {
@@ -490,6 +497,7 @@ public abstract class SharedTree<M extends SharedTreeModel<M,P,O>, P extends Sha
       }
   }
 
+  //FIXME: Use weights
   double initial_MSE( Vec train, Vec test ) {
     if( train.isEnum() ) {
       // Guess the class of the most populous class; call the fraction of those

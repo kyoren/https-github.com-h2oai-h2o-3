@@ -18,7 +18,7 @@ public abstract class SharedTreeModel<M extends SharedTreeModel<M,P,O>, P extend
 
     public int _max_depth = 5; // Maximum tree depth. Grid Search, comma sep values:5,7
 
-    public int _min_rows = 10; // Fewest allowed observations in a leaf (in R called 'nodesize'). Grid Search, comma sep values
+    public double _min_rows = 10; // Fewest allowed observations in a leaf (in R called 'nodesize'). Grid Search, comma sep values
 
     public int _nbins = 20; // Numerical (real/int) cols: Build a histogram of this many bins, then split at the best point
 
@@ -35,6 +35,17 @@ public abstract class SharedTreeModel<M extends SharedTreeModel<M,P,O>, P extend
     public int _nbins_top_level = 1<<10; //hardcoded minimum top-level number of bins for real-valued columns (not currently user-facing)
 
     public boolean _build_tree_one_node = false;
+
+    public int _nfolds = 1;
+
+    /** Distribution functions.  Note: AUTO will select gaussian for
+     *  continuous, and multinomial for categorical response
+     *
+     *  <p>TODO: Replace with drop-down that displays different distributions
+     *  depending on cont/cat response
+     */
+    public Distributions.Family _distribution = Distributions.Family.AUTO;
+    public float _tweedie_power=1.5f;
   }
 
   final public VarImp varImp() { return _output._varimp; }
@@ -56,9 +67,8 @@ public abstract class SharedTreeModel<M extends SharedTreeModel<M,P,O>, P extend
      *  For GBM bernoulli, the initial prediction for 0 trees is
      *  p = 1/(1+exp(-f0))
      *
-     *  From this, the mse for 0 trees can be computed as follows:
+     *  From this, the mse for 0 trees (null model) can be computed as follows:
      *  mean((yi-p)^2)
-     *  This is what is stored in _scored_train[0]
      * */
     public double _init_f;
 
@@ -130,18 +140,19 @@ public abstract class SharedTreeModel<M extends SharedTreeModel<M,P,O>, P extend
     // Invoke scoring
     Arrays.fill(preds,0);
     for( int tidx=0; tidx<_output._treeKeys.length; tidx++ )
-      score0(data, preds, tidx, weight, offset);
+      score0(data, preds, tidx);
     return preds;
   }
   // Score per line per tree
-  private void score0(double data[], double preds[], int treeIdx, double weight, double offset) {
+  private void score0(double data[], double preds[], int treeIdx) {
     Key[] keys = _output._treeKeys[treeIdx];
-    for( int c=0; c<keys.length; c++ )
-      if( keys[c] != null ) {
+    for( int c=0; c<keys.length; c++ ) {
+      if (keys[c] != null) {
         double pred = DKV.get(keys[c]).<CompressedTree>get().score(data);
-        assert(!Double.isInfinite(pred));
+        assert (!Double.isInfinite(pred));
         preds[keys.length == 1 ? 0 : c + 1] += pred;
       }
+    }
   }
 
   @Override protected Futures remove_impl( Futures fs ) {

@@ -48,7 +48,8 @@ ext {
       project(':h2o-app'),
       project(':h2o-scala'),
       project(':h2o-persist-hdfs'),
-      project(':h2o-genmodel')
+      project(':h2o-genmodel'),
+      project(':h2o-java-rest-bindings')
     ]
 
     javaProjects = [
@@ -59,7 +60,8 @@ ext {
       project(':h2o-persist-hdfs'),
       project(':h2o-test-integ'),
       project(':h2o-testng'),
-      project(':h2o-genmodel')
+      project(':h2o-genmodel'),
+      project(':h2o-java-rest-bindings'),
     ]
 
     scalaProjects = [
@@ -135,6 +137,14 @@ subprojects {
     // to all projects
     if (project in publishedProjects) {
       apply from: "$rootDir/gradle/publish.gradle"
+      // Generate Java6 bytecode only if specified
+      if (project.hasProperty("doJava6Bytecode")) {
+        if (project.doJava6Bytecode == "true"
+            || (project.doJava6Bytecode == "auto"
+                && System.getProperty("user.name").equals("jenkins")
+                && System.getenv("JAVA_6_HOME")))
+          apply from: "$rootDir/gradle/java6bytecode.gradle"
+      }
     }
 
     apply from: "$rootDir/gradle/makeSupport.gradle"
@@ -213,10 +223,15 @@ task buildH2oDevDist(type: Exec) {
     def branchName = bv.getBranch()
     def buildNumber = bv.getBuildNumber()
     def lastCommitHash = bv.getLastCommitHash()
+    def java6home = System.getenv("JAVA_6_HOME")
+
     environment['PROJECT_VERSION'] = projectVersion
     environment['BRANCH_NAME'] = branchName
     environment['BUILD_NUMBER'] = buildNumber
     environment['LAST_COMMIT_HASH'] = lastCommitHash
+    if (java6home != null) {
+      environment['JAVA_6_HOME'] = java6home
+    }
     commandLine './make-dist.sh'
 }
 

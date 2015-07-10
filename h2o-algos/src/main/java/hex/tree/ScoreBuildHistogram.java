@@ -1,5 +1,6 @@
 package hex.tree;
 
+import hex.Distributions;
 import water.MRTask;
 import water.H2O.H2OCountedCompleter;
 import water.fvec.C0DChunk;
@@ -40,8 +41,9 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
   // Histograms for every tree, split & active column
   final DHistogram _hcs[/*tree-relative node-id*/][/*column*/];
   final boolean _subset;      // True if working a subset of cols
+  final Distributions.Family _family;
 
-  public ScoreBuildHistogram(H2OCountedCompleter cc, int k, int ncols, int nbins, int nbins_cats, DTree tree, int leaf, DHistogram hcs[][], boolean subset) {
+  public ScoreBuildHistogram(H2OCountedCompleter cc, int k, int ncols, int nbins, int nbins_cats, DTree tree, int leaf, DHistogram hcs[][], boolean subset, Distributions.Family family) {
     super(cc);
     _k    = k;
     _ncols= ncols;
@@ -52,6 +54,7 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
     _hcs  = hcs;
     _subset = subset;
     _modifiesInputs = true;
+    _family = family;
   }
 
   /** Marker for already decided row. */
@@ -167,7 +170,7 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
         //FIXME/TODO: sum into local variables, do atomic increment once at the end, similar to accum_all
         for( int col : sCols ) { // For tracked cols
           double w = weight.atd(row);
-          assert (w > 0.0);
+          if (w == 0) continue;
           nhs[col].incr((float) chks[col].atd(row), wrks.atd(row), w); // Histogram row/col
         }
       }
@@ -231,13 +234,13 @@ public class ScoreBuildHistogram extends MRTask<ScoreBuildHistogram> {
         // Gather min/max, sums and sum-squares.
         for( int xrow=lo; xrow<hi; xrow++ ) {
           int row = rows[xrow];
+          double w = weight.atd(row);
+          if (w == 0) continue;
           float col_data = (float)chk.atd(row);
           if( col_data < min ) min = col_data;
           if( col_data > max ) max = col_data;
           int b = rh.bin(col_data); // Compute bin# via linear interpolation
           double resp = wrks.atd(row);
-          double w = weight.atd(row);
-          assert (w > 0);
           bins[b] += w;                // Bump count in bin
           sums[b] += w*resp;
           ssqs[b] += w*resp*resp;
