@@ -170,6 +170,14 @@ def ifelse(test,yes,no):
   """
   return H2OFrame(expr=ExprNode("ifelse",test,yes,no))._frame()
 
+def get_future_model(future_model):
+  """
+  Waits for the future model to finish building, and then returns the model.
+
+  :param future_model: an H2OModelFuture object
+  :return: a resolved model (i.e. an H2OBinomialModel, H2ORegressionModel, H2OMultinomialModel, ...)
+  """
+  return h2o_model_builder._resolve_model(future_model)
 
 def get_model(model_id):
   """
@@ -250,30 +258,30 @@ def check_models(model1, model2, use_validation=False, op='e'):
   # 1. Check model types
   model1_type = type(model1)
   model2_type = type(model2)
-  assert model1_type == model2_type, "The model types differ. The first model is of type {1} and the second " \
-                                     "models is of type {2}.".format(model1_type, model2_type)
+  assert model1_type == model2_type, "The model types differ. The first model is of type {0} and the second " \
+                                     "models is of type {1}.".format(model1_type, model2_type)
 
   # 2. Check model metrics
   if isinstance(model1,H2OBinomialModel): #   2a. Binomial
     # F1
     f1_1 = model1.F1(valid=use_validation)
     f1_2 = model2.F1(valid=use_validation)
-    if op == 'e': assert f1_1 == f1_2, "The first model has an F1 of {1} and the second model has an F1 of " \
-                                       "{2}. Expected the first to be == to the second.".format(f1_1, f1_2)
-    elif op == 'g': assert f1_1 > f1_2, "The first model has an F1 of {1} and the second model has an F1 of " \
-                                        "{2}. Expected the first to be > than the second.".format(f1_1, f1_2)
-    elif op == 'ge': assert f1_1 >= f1_2, "The first model has an F1 of {1} and the second model has an F1 of " \
-                                          "{2}. Expected the first to be >= than the second.".format(f1_1, f1_2)
+    if op == 'e': assert f1_1 == f1_2, "The first model has an F1 of {0} and the second model has an F1 of " \
+                                       "{1}. Expected the first to be == to the second.".format(f1_1, f1_2)
+    elif op == 'g': assert f1_1 > f1_2, "The first model has an F1 of {0} and the second model has an F1 of " \
+                                        "{1}. Expected the first to be > than the second.".format(f1_1, f1_2)
+    elif op == 'ge': assert f1_1 >= f1_2, "The first model has an F1 of {0} and the second model has an F1 of " \
+                                          "{1}. Expected the first to be >= than the second.".format(f1_1, f1_2)
   elif isinstance(model1,H2ORegressionModel): #   2b. Regression
     # MSE
     mse1 = model1.mse(valid=use_validation)
     mse2 = model2.mse(valid=use_validation)
-    if op == 'e': assert mse1 == mse2, "The first model has an MSE of {1} and the second model has an MSE of " \
-                                       "{2}. Expected the first to be == to the second.".format(mse1, mse2)
-    elif op == 'g': assert mse1 > mse2, "The first model has an MSE of {1} and the second model has an MSE of " \
-                                        "{2}. Expected the first to be > than the second.".format(mse1, mse2)
-    elif op == 'ge': assert mse1 >= mse2, "The first model has an MSE of {1} and the second model has an MSE of " \
-                                          "{2}. Expected the first to be >= than the second.".format(mse1, mse2)
+    if op == 'e': assert mse1 == mse2, "The first model has an MSE of {0} and the second model has an MSE of " \
+                                       "{1}. Expected the first to be == to the second.".format(mse1, mse2)
+    elif op == 'g': assert mse1 > mse2, "The first model has an MSE of {0} and the second model has an MSE of " \
+                                        "{1}. Expected the first to be > than the second.".format(mse1, mse2)
+    elif op == 'ge': assert mse1 >= mse2, "The first model has an MSE of {0} and the second model has an MSE of " \
+                                          "{1}. Expected the first to be >= than the second.".format(mse1, mse2)
   elif isinstance(model1,H2OMultinomialModel): #   2c. Multinomial
     # hit-ratio
     pass
@@ -281,14 +289,14 @@ def check_models(model1, model2, use_validation=False, op='e'):
     # totss
     totss1 = model1.totss(valid=use_validation)
     totss2 = model2.totss(valid=use_validation)
-    if op == 'e': assert totss1 == totss2, "The first model has an TOTSS of {1} and the second model has an " \
-                                           "TOTSS of {2}. Expected the first to be == to the second.".format(totss1,
+    if op == 'e': assert totss1 == totss2, "The first model has an TOTSS of {0} and the second model has an " \
+                                           "TOTSS of {1}. Expected the first to be == to the second.".format(totss1,
                                                                                                              totss2)
-    elif op == 'g': assert totss1 > totss2, "The first model has an TOTSS of {1} and the second model has an " \
-                                            "TOTSS of {2}. Expected the first to be > than the second.".format(totss1,
+    elif op == 'g': assert totss1 > totss2, "The first model has an TOTSS of {0} and the second model has an " \
+                                            "TOTSS of {1}. Expected the first to be > than the second.".format(totss1,
                                                                                                                totss2)
-    elif op == 'ge': assert totss1 >= totss2, "The first model has an TOTSS of {1} and the second model has an " \
-                                              "TOTSS of {2}. Expected the first to be >= than the second." \
+    elif op == 'ge': assert totss1 >= totss2, "The first model has an TOTSS of {0} and the second model has an " \
+                                              "TOTSS of {1}. Expected the first to be >= than the second." \
                                               "".format(totss1, totss2)
 
 def check_dims_values(python_obj, h2o_frame, rows, cols):
@@ -704,6 +712,17 @@ def glm(x,y,validation_x=None,validation_y=None,**kwargs):
   kwargs = dict([(k, kwargs[k]) if k != "Lambda" else ("lambda", kwargs[k]) for k in kwargs])
   return h2o_model_builder.supervised_model_build(x,y,validation_x,validation_y,"glm",kwargs)
 
+def start_glm_job(x,y,validation_x=None,validation_y=None,**kwargs):
+  """
+  Build a Generalized Linear Model (kwargs are the same arguments that you can find in FLOW).
+  Note: this function is the same as glm(), but it doesn't block on model-build. Instead, it returns and H2OModelFuture
+  object immediately. The model can be retrieved from the H2OModelFuture object with get_future_model().
+
+  :return: H2OModelFuture
+  """
+
+  kwargs["do_future"] = True
+  return glm(x,y,validation_x,validation_y,**kwargs)
 
 def kmeans(x,validation_x=None,**kwargs):
   """
@@ -745,7 +764,6 @@ def prcomp(x,validation_x=None,**kwargs):
   every categorical variable will be dropped. Defaults to FALSE.
   :return: a new dim reduction model
   """
-  kwargs['_rest_version'] = 99
   return h2o_model_builder.unsupervised_model_build(x,validation_x,"pca",kwargs)
 
 
