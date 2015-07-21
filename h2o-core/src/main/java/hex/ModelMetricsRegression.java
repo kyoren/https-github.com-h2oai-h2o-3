@@ -5,10 +5,10 @@ import water.fvec.Frame;
 import water.util.ArrayUtils;
 
 public class ModelMetricsRegression extends ModelMetricsSupervised {
-  public final double _residual_deviance;
-  public ModelMetricsRegression(Model model, Frame frame, double mse, double sigma, double deviance) {
+  public final double _mean_residual_deviance;
+  public ModelMetricsRegression(Model model, Frame frame, double mse, double sigma, double meanResidualDeviance) {
     super(model, frame, mse, null, sigma);
-    _residual_deviance = deviance;
+    _mean_residual_deviance = meanResidualDeviance;
   }
 
   public static ModelMetricsRegression getFromDKV(Model model, Frame frame) {
@@ -46,10 +46,16 @@ public class ModelMetricsRegression extends ModelMetricsSupervised {
       return ds;                // Flow coding
     }
 
+    public void reduce( MetricBuilderRegression mb ) {
+      super.reduce(mb);
+      _sumdeviance += mb._sumdeviance;
+    }
+
     // Having computed a MetricBuilder, this method fills in a ModelMetrics
     public ModelMetrics makeModelMetrics( Model m, Frame f) {
       double mse = _sumsqe / _wcount;
-      return m._output.addModelMetrics(new ModelMetricsRegression( m, f, mse, weightedSigma(), _sumdeviance));
+      double meanResDeviance = _sumdeviance / _wcount; //mean residual deviance
+      return m._output.addModelMetrics(new ModelMetricsRegression( m, f, mse, weightedSigma(), meanResDeviance));
     }
 
     public String toString() {return " mse = " + _sumsqe / _wcount;}
