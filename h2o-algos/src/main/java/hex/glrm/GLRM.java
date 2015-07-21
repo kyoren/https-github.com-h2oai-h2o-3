@@ -192,7 +192,7 @@ public class GLRM extends ModelBuilder<GLRMModel,GLRMModel.GLRMParameters,GLRMMo
 
     // Initialize Y and X matrices
     // tinfo = original training data A, dinfo = [A,X,W] where W is working copy of X (initialized here)
-    private double[][] initialXY(DataInfo tinfo, DataInfo dinfo) {
+    private double[][] initialXY(DataInfo tinfo, DataInfo dinfo, long na_cnt) {
       double[][] centers, centers_exp = null;
 
       if (null != _parms._user_points) { // User-specified starting points
@@ -264,7 +264,7 @@ public class GLRM extends ModelBuilder<GLRMModel,GLRMModel.GLRMParameters,GLRMMo
 
           // Score only if clusters well-defined and closed-form solution does not exist
           double frob = frobenius2(km._output._centers_raw);
-          if(frob != 0 && !Double.isNaN(frob) && !_parms.hasClosedForm())
+          if(frob != 0 && !Double.isNaN(frob) && na_cnt == 0 && !_parms.hasClosedForm())
             initialXKmeans(dinfo, km);
         } finally {
           if (job != null) job.remove();
@@ -423,7 +423,7 @@ public class GLRM extends ModelBuilder<GLRMModel,GLRMModel.GLRMParameters,GLRMMo
         model.delete_and_lock(self());
 
         // Save adapted frame info for scoring later
-        tinfo = new DataInfo(Key.make(), _train, _valid, 0, true, _parms._transform, DataInfo.TransformType.NONE, false, false, /* weights */ false, /* offset */ false);
+        tinfo = new DataInfo(Key.make(), _train, _valid, 0, true, _parms._transform, DataInfo.TransformType.NONE, false, false, /* weights */ false, /* offset */ false, /* fold */ false);
         DKV.put(tinfo._key, tinfo);
 
         // Save training frame adaptation information for use in scoring later
@@ -440,8 +440,10 @@ public class GLRM extends ModelBuilder<GLRMModel,GLRMModel.GLRMParameters,GLRMMo
         model._output._names_expanded = tinfo.coefNames();
 
         long nobs = _train.numRows() * _train.numCols();
-        for(int i = 0; i < _train.numCols(); i++) nobs -= _train.vec(i).naCnt();   // TODO: Should we count NAs?
-        model._output._nobs = nobs;
+        long na_cnt = 0;
+        for(int i = 0; i < _train.numCols(); i++)
+          na_cnt += _train.vec(i).naCnt();
+        model._output._nobs = nobs - na_cnt;   // TODO: Should we count NAs?
 
         // 0) Initialize Y and X matrices
         // Jam A and X into a single frame for distributed computation
@@ -451,13 +453,14 @@ public class GLRM extends ModelBuilder<GLRMModel,GLRMModel.GLRMParameters,GLRMMo
         for (int i = _ncolA; i < vecs.length; i++)
           vecs[i] = _train.anyVec().makeGaus(_parms._seed);   // By default, initialize X to random Gaussian matrix
         fr = new Frame(null, vecs);
-        dinfo = new DataInfo(Key.make(), fr, null, 0, true, _parms._transform, DataInfo.TransformType.NONE, false, false, /* weights */ false, /* offset */ false);
+        dinfo = new DataInfo(Key.make(), fr, null, 0, true, _parms._transform, DataInfo.TransformType.NONE, false, false, /* weights */ false, /* offset */ false, /* fold */ false);
         DKV.put(dinfo._key, dinfo);
 
         // Use closed form solution for X if L2 loss and regularization
-        double[][] yt = initialXY(tinfo, dinfo);
+        double[][] yt = initialXY(tinfo, dinfo, na_cnt);
         yt = ArrayUtils.transpose(yt);
-        if (_parms.hasClosedForm()) initialXClosedForm(dinfo, yt, model._output._normSub, model._output._normMul);
+        if (na_cnt == 0 && _parms.hasClosedForm())
+          initialXClosedForm(dinfo, yt, model._output._normSub, model._output._normMul);
 
         // Compute initial objective function
         ObjCalc objtsk = new ObjCalc(dinfo, _parms, yt, _ncolA, _ncolX, model._output._normSub, model._output._normMul, _parms._gamma_x != 0).doAll(dinfo._adaptedFrame);
@@ -513,7 +516,7 @@ public class GLRM extends ModelBuilder<GLRMModel,GLRMModel.GLRMParameters,GLRMMo
           for (int i = 0; i < _ncolX; i++) xvecs[i] = fr.vec(idx_xold(i, _ncolA));
         }
         x = new Frame(_parms._loading_key, null, xvecs);
-        xinfo = new DataInfo(Key.make(), x, null, 0, true, DataInfo.TransformType.NONE, DataInfo.TransformType.NONE, false, false, /* weights */ false, /* offset */ false);
+        xinfo = new DataInfo(Key.make(), x, null, 0, true, DataInfo.TransformType.NONE, DataInfo.TransformType.NONE, false, false, /* weights */ false, /* offset */ false, /* fold */ false);
         DKV.put(x._key, x);
         DKV.put(xinfo._key, xinfo);
         model._output._loading_key = _parms._loading_key;
