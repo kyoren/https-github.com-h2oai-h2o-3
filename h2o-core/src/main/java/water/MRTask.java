@@ -484,9 +484,12 @@ public abstract class MRTask<T extends MRTask<T>> extends DTask<T> implements Fo
   public final T getResult() {
     try { ForkJoinPool.managedBlock(this); }
     catch( InterruptedException ignore ) { }
-    catch( RuntimeException re ) { setException(re);  }
+    catch( Throwable re ) { setException(re);  }
     DException.DistributedException de = getDException();
-    if( de != null ) throw new RuntimeException(de);
+    if( de != null ) {
+      System.err.println("MRTask getResult: " + de);
+      throw new RuntimeException(de);
+    }
     assert _topGlobal:"lost top global flag";
     return self();
   }
