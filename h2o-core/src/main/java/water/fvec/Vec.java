@@ -760,6 +760,7 @@ public class Vec extends Keyed<Vec> {
 
   private boolean checkMissing(int cidx, Value val) {
     if( val != null ) return true;
+    new Error().printStackTrace();
     Log.err("Error: Missing chunk "+cidx+" for "+_key);
     return false;
   }
