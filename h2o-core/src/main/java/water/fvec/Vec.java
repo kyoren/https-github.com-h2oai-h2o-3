@@ -762,6 +762,7 @@ public class Vec extends Keyed<Vec> {
     if( val != null ) return true;
     new Error().printStackTrace();
     Log.err("Error: Missing chunk "+cidx+" for "+_key);
+    Log.err("espc: "+Arrays.toString(_espc));
     return false;
   }
 
