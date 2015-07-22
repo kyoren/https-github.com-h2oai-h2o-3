@@ -585,6 +585,7 @@ public final class ParseDataset extends Job<Frame> {
     // Called once per file
     @Override public void map( Key key ) {
       if (((Job)DKV.getGet(_jobKey)).isCancelledOrCrashed()) return;
+      Log.info("MFPT map " + key);
       ParseSetup localSetup = new ParseSetup(_parseSetup);
       ByteVec vec = getByteVec(key);
       final int chunkStartIdx = _fileChunkOffsets[_lo];
