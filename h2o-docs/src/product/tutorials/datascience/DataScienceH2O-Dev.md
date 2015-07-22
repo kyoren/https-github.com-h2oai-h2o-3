@@ -1,13 +1,6 @@
-#Data Science in H2O-Dev
+# Data Science Algorithms
 
-- [K-Means](#Kmeans)
-- [GLM](#GLM)
-- [DRF](#DRF)
-- [NaiveBayes](#NB)
-- [PCA](#PCA)
-- [GBM](#GBM)
-- [Deep Learning](#DL)
-
+This document describes how to define the models and how to interpret the model, as well the algorithm itself, and provides an FAQ. 
 
 ##Commonalities 
 
@@ -27,29 +20,32 @@ K-Means falls in the general category of clustering algorithms.
 
 ###Defining a K-Means Model
 
-- **Destination\_key**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
+- **Model_id**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
 
 - **Training_frame**: (Required) Select the dataset used to build the model. 
 **NOTE**: If you click the **Build a model** button from the `Parse` cell, the training frame is entered automatically. 
 
 - **Validation_frame**: (Optional) Select the dataset used to evaluate the accuracy of the model. 
 
-- **Ignored_columns**: (Optional) Click the plus sign next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Add all** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Clear all** button. 
+- **Ignored_columns**: (Optional) Click the checkbox next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Select All** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Deselect All** button. To search for a specific column, type the column name in the **Search** field above the column list. To only show columns with a specific percentage of missing values, specify the percentage in the **Only show columns with more than 0% missing values** field. To change the selections for the hidden columns, use the **Select Visible** or **Deselect Visible** buttons. 
 
-- **Drop\_na20\_cols**: (Optional) Check this checkbox to omit columns that have at least 20% missing values.
+- **Ignore\_const\_cols**: (Optional) Check this checkbox to ignore constant training columns, since no information can be gained from them. This option is selected by default. 
 
-- **Score\_each\_iteration**: (Optional) Check this checkbox to score during each iteration of the model training. 
-
-- **K**: Specify the number of clusters. The default is 1. 
+- **K**: Specify the number of clusters.  
 
 - **User_points**: Specify a vector of initial cluster centers.
 
-- **Max_iterations**: Specify the maximum number of training iterations. The default is 1000.
+- **Max_iterations**: Specify the maximum number of training iterations. 
 
 - **Init**: Select the initialization mode. The options are Random, Furthest, PlusPlus, or User. **Note**: If PlusPlus is selected, the initial Y matrix is chosen by the final cluster centers from the K-Means PlusPlus algorithm. 
 
+- **Score\_each\_iteration**: (Optional) Check this checkbox to score during each iteration of the model training. 
+
 - **Standardize**: To standardize the numeric columns to have mean of zero and unit variance, check this checkbox. Standardization is highly recommended; if you do not use standardization, the results can include components that are dominated by variables that appear to have larger variances relative to other attributes as a matter of scale, rather than true contribution. This option is selected by default. 
 
+ >**Note**: If standardization is enabled, each column of numeric data is centered and scaled so that its mean is zero and its standard deviation is one before the algorithm is used. At the end of the process, the cluster centers on both the standardized scale (`centers_std`) and the de-standardized scale (`centers`) are displayed. 
+ >To de-standardize the centers, the algorithm multiplies by the original standard deviation of the corresponding column and adds the original mean. Enabling standardization is mathematically equivalent to using `h2o.scale` in R with `center` = TRUE and `scale` = TRUE on the numeric columns. Therefore, there will be no discernible difference if standardization is enabled or not for K-Means, since H2O calculates unstandardized centroids. 
+ 
 - **Seed**: Specify the random number generator (RNG) seed for algorithm components dependent on randomization. The seed is consistent for each H2O instance so that you can create models with the same starting conditions in alternative configurations. 
 
 ###Interpreting a K-Means Model
@@ -97,51 +93,51 @@ The output is a matrix of the cluster assignments and the coordinates of the clu
 
 ###K-Means Algorithm
 
-The number of clusters $$K$$ is user-defined and is determined a priori. 
+The number of clusters \(K\) is user-defined and is determined a priori. 
 
-1. Choose $$K$$ initial cluster centers $$m_{k}$$ according to one of
+1. Choose \(K\) initial cluster centers \(m_{k}\) according to one of
    the following:
 
-    - **Randomization**: Choose $$K$$ clusters from the set of $$N$$ observations at random so that each observation has an equal chance of being chosen.
+    - **Randomization**: Choose \(K\) clusters from the set of \(N\) observations at random so that each observation has an equal chance of being chosen.
 
     - **Plus Plus**  
 
-      a. Choose one center $$m_{1}$$ at random. 
+      a. Choose one center \(m_{1}\) at random. 
 
-      2.  Calculate the difference between $$m_{1}$$ and each of the remaining $$N-1$$ observations $$x_{i}$$. 
-  $$d(x_{i}, m_{1}) = ||(x_{i}-m_{1})||^2$$
+      2.  Calculate the difference between \(m_{1}\) and each of the remaining \(N-1\) observations \(x_{i}\). 
+  \(d(x_{i}, m_{1}) = ||(x_{i}-m_{1})||^2\)
 
-      3. Let $$P(i)$$ be the probability of choosing $$x_{i}$$ as $$m_{2}$$. Weight $$P(i)$$ by $$d(x_{i}, m_{1})$$ so that those $$x_{i}$$ furthest from $$m_{2}$$ have  a higher probability of being selected than those $$x_{i}$$ close to $$m_{1}$$.
+      3. Let \(P(i)\) be the probability of choosing \(x_{i}\) as \(m_{2}\). Weight \(P(i)\) by \(d(x_{i}, m_{1})\) so that those \(x_{i}\) furthest from \(m_{2}\) have  a higher probability of being selected than those \(x_{i}\) close to \(m_{1}\).
 
-      4. Choose the next center $$m_{2}$$ by drawing at random according to the weighted probability distribution. 
+      4. Choose the next center \(m_{2}\) by drawing at random according to the weighted probability distribution. 
 
-      5.  Repeat until $$K$$ centers have been chosen.
+      5.  Repeat until \(K\) centers have been chosen.
 
    - **Furthest**
 
-       a. Choose one center $$m_{1}$$ at random. 
+       a. Choose one center \(m_{1}\) at random. 
 
-       2. Calculate the difference between $$m_{1}$$ and each of the remaining $$N-1$$ observations $$x_{i}$$. 
-       $$d(x_{i}, m_{1}) = ||(x_{i}-m_{1})||^2$$
+       2. Calculate the difference between \(m_{1}\) and each of the remaining \(N-1\) observations \(x_{i}\). 
+       \(d(x_{i}, m_{1}) = ||(x_{i}-m_{1})||^2\)
 
-       3. Choose $$m_{2}$$ to be the $$x_{i}$$ that maximizes $$d(x_{i}, m_{1})$$.
+       3. Choose \(m_{2}\) to be the \(x_{i}\) that maximizes \(d(x_{i}, m_{1})\).
 
-       4. Repeat until $$K$$ centers have been chosen. 
+       4. Repeat until \(K\) centers have been chosen. 
 
-2. Once $$K$$ initial centers have been chosen calculate the difference between each observation $$x_{i}$$ and each of the centers $$m_{1},...,m_{K}$$, where difference is the squared Euclidean distance taken over $$p$$ parameters.  
+2. Once \(K\) initial centers have been chosen calculate the difference between each observation \(x_{i}\) and each of the centers \(m_{1},...,m_{K}\), where difference is the squared Euclidean distance taken over \(p\) parameters.  
   
-   $$d(x_{i}, m_{k})=$$
-   $$\sum_{j=1}^{p}(x_{ij}-m_{k})^2=$$
- $$\lVert(x_{i}-m_{k})\rVert^2$$
+   \(d(x_{i}, m_{k})=\)
+   \(\sum_{j=1}^{p}(x_{ij}-m_{k})^2=\)
+ \(\lVert(x_{i}-m_{k})\rVert^2\)
 
 
-3. Assign $$x_{i}$$ to the cluster $$k$$ defined by $$m_{k}$$ that minimizes $$d(x_{i}, m_{k})$$
+3. Assign \(x_{i}\) to the cluster \(k\) defined by \(m_{k}\) that minimizes \(d(x_{i}, m_{k})\)
 
-4. When all observations $$x_{i}$$ are assigned to a cluster calculate the mean of the points in the cluster. 
+4. When all observations \(x_{i}\) are assigned to a cluster calculate the mean of the points in the cluster. 
 
-	$$\bar{x}(k)=\lbrace\bar{x_{i1}},…\bar{x_{ip}}\rbrace$$
+	\(\bar{x}(k)=\lbrace\bar{x_{i1}},…\bar{x_{ip}}\rbrace\)
 
-5. Set the $$\bar{x}(k)$$ as the new cluster centers $$m_{k}$$. Repeat steps 2 through 5 until the specified number of max iterations is reached or cluster assignments of the $$x_{i}$$ are stable.
+5. Set the \(\bar{x}(k)\) as the new cluster centers \(m_{k}\). Repeat steps 2 through 5 until the specified number of max iterations is reached or cluster assignments of the \(x_{i}\) are stable.
 
 
 
@@ -170,46 +166,74 @@ The GLM suite includes:
 
 ###Defining a GLM Model
 
-- **Destination\_key**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
+- **Model_id**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
 
 - **Training_frame**: (Required) Select the dataset used to build the model. 
 **NOTE**: If you click the **Build a model** button from the `Parse` cell, the training frame is entered automatically. 
 
 - **Validation_frame**: (Optional) Select the dataset used to evaluate the accuracy of the model. 
 
-- **Ignored_columns**: (Optional) Click the plus sign next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Add all** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Clear all** button. 
+- **Nfolds**: Specify the number of folds for cross-validation. 
 
-- **Drop\_na20\_cols**: (Optional) Check this checkbox to omit columns that have at least 20% missing values.
+- **Fold_column**: Select the column that contains the cross-validation fold index assignment per observation. 
 
 - **Response_column**: (Required) Select the column to use as the independent variable.
 
-- **Family**: Select the model type (Gaussian, Binomial, Poisson, or Gamma).
+- **Ignored_columns**: (Optional) Click the checkbox next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Select All** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Deselect All** button. To search for a specific column, type the column name in the **Search** field above the column list. To only show columns with a specific percentage of missing values, specify the percentage in the **Only show columns with more than 0% missing values** field. To change the selections for the hidden columns, use the **Select Visible** or **Deselect Visible** buttons. 
 
-- **Solver**: Select the solver to use (IRLSM, L\_BFGS, or auto). IRLSM is fast on on problems with small number of predictors and for lambda-search with L1 penalty, while [L_BFGS](http://cran.r-project.org/web/packages/lbfgs/vignettes/Vignette.pdf) scales better for datasets with many columns. The default is IRLSM. 
+- **Ignore\_const\_cols**: Check this checkbox to ignore constant training columns, since no information can be gained from them. This option is selected by default. 
 
-- **Alpha**: Specify the regularization distribution between L2 and L2. The default value is 0.5. 
+- **Offset_column**: Select a column to use as the offset. 
+	>*Note*: Offsets are per-row "bias values" that are used during model training. For Gaussian distributions, they can be seen as simple corrections to the response (y) column. Instead of learning to predict the response (y-row), the model learns to predict the (row) offset of the response column. For other distributions, the offset corrections are applied in the linearized space before applying the inverse link function to get the actual response values. For more information, refer to the following [link](http://www.idg.pl/mirrors/CRAN/web/packages/gbm/vignettes/gbm.pdf). 
 
-- **Lambda**:  Specify the regularization strength. The default value is data dependent.
+- **Weights_column**: Select a column to use for the observation weights, which are used for bias correction.
+	>*Note*: Weights are per-row observation weights. This is typically the number of times a row is repeated, but non-integer values are supported as well. During training, rows with higher weights matter more, due to the larger loss function pre-factor.  
+
+- **Family**: Select the model type (Gaussian, Binomial, Poisson, Gamma, or Tweedie).
+
+- **Tweedie_variance_power**: (Only applicable if *Tweedie* is selected for **Family**) Specify the Tweedie variance power. 
+
+- **Tweedie_link_power**: (Only applicable if *Tweedie* is selected for **Family**) Specify the Tweedie link power. 
+
+- **Solver**: Select the solver to use (IRLSM, L\_BFGS, or auto). IRLSM is fast on problems with small number of predictors and for lambda-search with L1 penalty, while [L_BFGS](http://cran.r-project.org/web/packages/lbfgs/vignettes/Vignette.pdf) scales better for datasets with many columns.  
+
+- **Alpha**: Specify the regularization distribution between L2 and L2.  
+
+- **Lambda**:  Specify the regularization strength. 
 
 - **Lambda_search**: Check this checkbox to enable lambda search, starting with lambda max. The given lambda is then interpreted as lambda min. 
 
 - **Standardize**: To standardize the numeric columns to have a mean of zero and unit variance, check this checkbox. Standardization is highly recommended; if you do not use standardization, the results can include components that are dominated by variables that appear to have larger variances relative to other attributes as a matter of scale, rather than true contribution. This option is selected by default. 
 
+- **Non-negative**: To force coefficients to have non-negative values, check this checkbox. 
+
 - **Beta constraints**: To use beta constraints, select a dataset from the drop-down menu. The selected frame is used to constraint the coefficient vector to provide upper and lower bounds. 
+
+- **Score\_each\_iteration**: (Optional) Check this checkbox to score during each iteration of the model training. 
+
+- **Max_iterations**: Specify the number of training iterations.   
+
+- **Link**: Select a link function (Identity, Family_Default, Logit, Log, Inverse, or Tweedie).
 
 - **Max\_confusion\_matrix\_size**: Specify the maximum size (number of classes) for the confusion matrices printed in the logs. 
 
-- **Max\_hits\_ratio\_k**: Specify the maximum number (top K) of predictions to use for hit ratio computation. Applicable to multi-class only. To disable, enter `0`. 
+- **Max\_hit\_ratio\_k**: Specify the maximum number (top K) of predictions to use for hit ratio computation. Applicable to multi-class only. To disable, enter `0`. 
 
-- **Max_iterations**: Specify the number of training iterations. The default is 50.  
+- **Keep\_cross\_validation\_splits**: To keep the cross-validation frames, check this checkbox. 
+
+- **Fold_assignment**: (Applicable only if a value for **nfolds** is specified and **fold_column** is not selected) Select the cross-validation fold assignment scheme. The available options are Random or [Modulo](https://en.wikipedia.org/wiki/Modulo_operation). 
+
+- **Intercept**: To include a constant term in the model, check this checkbox. This option is selected by default. 
+
+- **Objective_epsilon**: Specify a threshold for convergence. If the objective value is less than this threshold, the model is converged. 
 
 - **Beta_epsilon**: Specify the beta epsilon value. If the L1 normalization of the current beta change is below this threshold, consider using convergence. 
 
-- **Link**: Select a link function (Identity, Family_Default, Logit, Log, or Inverse).
+- **Gradient_epsilon**: (For L-BFGS only) Specify a threshold for convergence. If the objective value (using the L-infinity norm) is less than this threshold, the model is converged. 
 
-- **Prior**: Specify prior probability for y ==1. Use this parameter for logistic regression if the data has been sampled and the mean of response does not reflect reality. The default value is 0. 
+- **Prior**: Specify prior probability for y ==1. Use this parameter for logistic regression if the data has been sampled and the mean of response does not reflect reality.  
 
-- **Max\_active_\predictors**: Specify the maximum number of active predictors during computation. This value is used as a stopping criterium to prevent expensive model building with many predictors. 
+- **Max\_active\_predictors**: Specify the maximum number of active predictors during computation. This value is used as a stopping criterium to prevent expensive model building with many predictors. 
 
 
 ###Interpreting a GLM Model
@@ -263,52 +287,52 @@ By default, the following output displays:
 
 Following the definitive text by P. McCullagh and J.A. Nelder (1989) on the generalization of linear models to non-linear distributions of the response variable Y, H2O fits GLM models based on the maximum likelihood estimation via iteratively reweighed least squares. 
 
-Let $$y_{1},…,y_{n}$$ be n observations of the independent, random response variable $$Y_{i}$$.
+Let \(y_{1},…,y_{n}\) be n observations of the independent, random response variable \(Y_{i}\).
 
 Assume that the observations are distributed according to a function from the exponential family and have a probability density function of the form:
 
-$$f(y_{i})=exp[\frac{y_{i}\theta_{i} - b(\theta_{i})}{a_{i}(\phi)} + c(y_{i}; \phi)]$$
-where $$\theta$$ and $$\phi$$ are location and scale parameters,
-and $$\: a_{i}(\phi), \:b_{i}(\theta_{i}),\: c_{i}(y_{i}; \phi)$$ are known functions.
+\(f(y_{i})=exp[\frac{y_{i}\theta_{i} - b(\theta_{i})}{a_{i}(\phi)} + c(y_{i}; \phi)]\)
+where \(\theta\) and \(\phi\) are location and scale parameters,
+and \(\: a_{i}(\phi), \:b_{i}(\theta_{i}),\: c_{i}(y_{i}; \phi)\) are known functions.
 
-$$a_{i}$$ is of the form $$\:a_{i}=\frac{\phi}{p_{i}}; p_{i}$$ is a known prior weight.
+\(a_{i}\) is of the form \(\:a_{i}=\frac{\phi}{p_{i}}; p_{i}\) is a known prior weight.
 
-When $$Y$$ has a pdf from the exponential family: 
+When \(Y\) has a pdf from the exponential family: 
 
-$$E(Y_{i})=\mu_{i}=b^{\prime}$$
-$$var(Y_{i})=\sigma_{i}^2=b^{\prime\prime}(\theta_{i})a_{i}(\phi)$$
+\(E(Y_{i})=\mu_{i}=b^{\prime}\)
+\(var(Y_{i})=\sigma_{i}^2=b^{\prime\prime}(\theta_{i})a_{i}(\phi)\)
 
-Let $$g(\mu_{i})=\eta_{i}$$ be a monotonic, differentiable transformation of the expected value of $$y_{i}$$. The function $$\eta_{i}$$ is the link function and follows a linear model.
+Let \(g(\mu_{i})=\eta_{i}\) be a monotonic, differentiable transformation of the expected value of \(y_{i}\). The function \(\eta_{i}\) is the link function and follows a linear model.
 
-$$g(\mu_{i})=\eta_{i}=\mathbf{x_{i}^{\prime}}\beta$$
+\(g(\mu_{i})=\eta_{i}=\mathbf{x_{i}^{\prime}}\beta\)
 
 When inverted: 
-$$\mu=g^{-1}(\mathbf{x_{i}^{\prime}}\beta)$$
+\(\mu=g^{-1}(\mathbf{x_{i}^{\prime}}\beta)\)
 
 **Maximum Likelihood Estimation**
 
-For an initial rough estimate of the parameters $$\hat{\beta}$$, use the estimate to generate fitted values: 
-$$\mu_{i}=g^{-1}(\hat{\eta_{i}})$$
+For an initial rough estimate of the parameters \(\hat{\beta}\), use the estimate to generate fitted values: 
+\(\mu_{i}=g^{-1}(\hat{\eta_{i}})\)
 
-Let $$z$$ be a working dependent variable such that 
-$$z_{i}=\hat{\eta_{i}}+(y_{i}-\hat{\mu_{i}})\frac{d\eta_{i}}{d\mu_{i}}$$,
+Let \(z\) be a working dependent variable such that 
+\(z_{i}=\hat{\eta_{i}}+(y_{i}-\hat{\mu_{i}})\frac{d\eta_{i}}{d\mu_{i}}\),
 
-where $$\frac{d\eta_{i}}{d\mu_{i}}$$ is the derivative of the link function evaluated at the trial estimate. 
+where \(\frac{d\eta_{i}}{d\mu_{i}}\) is the derivative of the link function evaluated at the trial estimate. 
 
 Calculate the iterative weights:
-$$w_{i}=\frac{p_{i}}{[b^{\prime\prime}(\theta_{i})\frac{d\eta_{i}}{d\mu_{i}}^{2}]}$$
+\(w_{i}=\frac{p_{i}}{[b^{\prime\prime}(\theta_{i})\frac{d\eta_{i}}{d\mu_{i}}^{2}]}\)
 
-Where $$b^{\prime\prime}$$ is the second derivative of $$b(\theta_{i})$$ evaluated at the trial estimate. 
+Where \(b^{\prime\prime}\) is the second derivative of \(b(\theta_{i})\) evaluated at the trial estimate. 
 
 
-Assume $$a_{i}(\phi)$$ is of the form $$\frac{\phi}{p_{i}}$$. The weight $$w_{i}$$ is inversely proportional to the variance of the working dependent variable $$z_{i}$$ for current parameter estimates and proportionality factor $$\phi$$.
+Assume \(a_{i}(\phi)\) is of the form \(\frac{\phi}{p_{i}}\). The weight \(w_{i}\) is inversely proportional to the variance of the working dependent variable \(z_{i}\) for current parameter estimates and proportionality factor \(\phi\).
 
-Regress $$z_{i}$$ on the predictors $$x_{i}$$ using the weights $$w_{i}$$ to obtain new estimates of $$\beta$$. 
-$$\hat{\beta}=(\mathbf{X}^{\prime}\mathbf{W}\mathbf{X})^{-1}\mathbf{X}^{\prime}\mathbf{W}\mathbf{z}$$ 
+Regress \(z_{i}\) on the predictors \(x_{i}\) using the weights \(w_{i}\) to obtain new estimates of \(\beta\). 
+\(\hat{\beta}=(\mathbf{X}^{\prime}\mathbf{W}\mathbf{X})^{-1}\mathbf{X}^{\prime}\mathbf{W}\mathbf{z}\) 
 
-Where $$\mathbf{X}$$ is the model matrix, $$\mathbf{W}$$ is a diagonal matrix of $$w_{i}$$, and $$\mathbf{z}$$ is a vector of the working response variable $$z_{i}$$.
+Where \(\mathbf{X}\) is the model matrix, \(\mathbf{W}\) is a diagonal matrix of \(w_{i}\), and \(\mathbf{z}\) is a vector of the working response variable \(z_{i}\).
 
-This process is repeated until the estimates $$\hat{\beta}$$ change by less than the specified amount. 
+This process is repeated until the estimates \(\hat{\beta}\) change by less than the specified amount. 
 
 **Cost of computation**
 
@@ -318,7 +342,7 @@ H2O can process large data sets because it relies on parallel processes. Large d
 In GLM, data are split by rows but not by columns, because the predicted Y values depend on information in each of the predictor variable vectors. If O is a complexity function, N is the number of observations (or rows), and P is the number of predictors (or columns) then 
 
 
-   &nbsp;&nbsp;&nbsp;&nbsp;$$Runtime\propto p^3+\frac{(N*p^2)}{CPUs}$$
+   &nbsp;&nbsp;&nbsp;&nbsp;\(Runtime\propto p^3+\frac{(N*p^2)}{CPUs}\)
 
 Distribution reduces the time it takes an algorithm to process because it decreases N.
  
@@ -327,7 +351,7 @@ Relative to P, the larger that (N/CPUs) becomes, the more trivial p becomes to t
 
 
 
-   &nbsp;&nbsp;&nbsp;&nbsp;$$Complexity = O(p^3 + N*p^2)$$ 
+   &nbsp;&nbsp;&nbsp;&nbsp;\(Complexity = O(p^3 + N*p^2)\) 
 
 
 
@@ -364,44 +388,66 @@ Distributed Random Forest (DRF) is a powerful classification tool. When given a 
 
 ###Defining a DRF Model
 
-- **Destination\_key**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
+- **Model_id**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
 
 - **Training_frame**: (Required) Select the dataset used to build the model. 
 **NOTE**: If you click the **Build a model** button from the `Parse` cell, the training frame is entered automatically. 
 
 - **Validation_frame**: (Optional) Select the dataset used to evaluate the accuracy of the model. 
 
-- **Ignored_columns**: (Optional) Click the plus sign next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Add all** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Clear all** button. 
+- **Nfolds**: Specify the number of folds for cross-validation. 
 
-- **Drop\_na20\_cols**: (Optional) Check this checkbox to omit columns that have at least 20% missing values.
-
-- **Score\_each\_iteration**: (Optional) Check this checkbox to score during each iteration of the model training. 
+- **Fold_column**: Select the column that contains the cross-validation fold index assignment per observation. 
 
 - **Response_column**: (Required) Select the column to use as the independent variable.
 
-- **Ntrees**: Specify the number of trees. The default value is 50. 
+- **Ignored_columns**: (Optional) Click the checkbox next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Select All** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Deselect All** button. To search for a specific column, type the column name in the **Search** field above the column list. To only show columns with a specific percentage of missing values, specify the percentage in the **Only show columns with more than 0% missing values** field. To change the selections for the hidden columns, use the **Select Visible** or **Deselect Visible** buttons. 
 
-- **Max\_depth**: Specify the maximum tree depth. The default value is 5. 
+- **Ignore\_const\_cols**: Check this checkbox to ignore constant training columns, since no information can be gained from them. This option is selected by default. 
 
-- **Min\_rows**: Specify the minimum number of observations for a leaf (`nodesize` in R). The default value is 10. 
+- **Offset_column**: Select a column to use as the offset. 
+	>*Note*: Offsets are per-row "bias values" that are used during model training. For Gaussian distributions, they can be seen as simple corrections to the response (y) column. Instead of learning to predict the response (y-row), the model learns to predict the (row) offset of the response column. For other distributions, the offset corrections are applied in the linearized space before applying the inverse link function to get the actual response values. For more information, refer to the following [link](http://www.idg.pl/mirrors/CRAN/web/packages/gbm/vignettes/gbm.pdf). 
 
-- **Nbins**: Specify the number of bins for the histogram. The default value is 20. 
+- **Weights_column**: Select a column to use for the observation weights, which are used for bias correction.
+	>*Note*: Weights are per-row observation weights. This is typically the number of times a row is repeated, but non-integer values are supported as well. During training, rows with higher weights matter more, due to the larger loss function pre-factor.  
 
-- **Mtries**: Specify the columns to randomly select at each level. To use the square root of the columns, enter `-1`.  The default value is -1.  
+- **Ntrees**: Specify the number of trees.  
 
-- **Sample\_rate**: Specify the sample rate. The range is 0 to 1.0 and the default value is 0.6666667. 
+- **Max\_depth**: Specify the maximum tree depth.
 
-- **Build\_tree\_one\_node**: To run on a single node, check this checkbox. This is suitable for small datasets as there is no network overhead but fewer CPUs are used. The default setting is disabled. 
+- **Min\_rows**: Specify the minimum number of observations for a leaf (`nodesize` in R).  
 
-- **Balance_classes**: Oversample the minority classes to balance the class distribution. This option is not selected by default. This option is only applicable for classification. Majority classes can be undersampled to satisfy the Max\_after\_balance\_size parameter.
+- **Nbins**: (Numerical/real/int only) Specify the number of bins for the histogram to build, then split at the best point.  
+
+- **Nbins_cats**: (Categorical/enums only) Specify the number of bins for the histogram to build, then split at the best point. Higher values can lead to more overfitting.  
+
+- **Seed**: Specify the random number generator (RNG) seed for algorithm components dependent on randomization. The seed is consistent for each H2O instance so that you can create models with the same starting conditions in alternative configurations. 
+
+- **Mtries**: Specify the columns to randomly select at each level. If the default value of `-1` is used, the number of variables is the square root of the number of columns for classification and p/3 for regression (where p is the number of predictors).   
+
+- **Sample\_rate**: Specify the sample rate. The range is 0 to 1.0. 
+
+- **Score\_each\_iteration**: (Optional) Check this checkbox to score during each iteration of the model training. 
+
+- **Balance_classes**: Oversample the minority classes to balance the class distribution. This option is not selected by default. This option is only applicable for classification. 
 
 - **Max\_confusion\_matrix\_size**: Specify the maximum size (in number of classes) for confusion matrices to be printed in the Logs. 
 
 - **Max\_hit\_ratio\_k**: Specify the maximum number (top K) of predictions to use for hit ratio computation. Applicable to multi-class only. To disable, enter 0. 
 
-- **Class\_sampling\_factors**: Specify the per-class (in lexicographical order) over/under-sampling ratios. By default, these ratios are automatically computed during training to obtain the class balance. There is no default value. 
+- **R2_stopping**: Specify a threshold for the coefficient of determination (\(r^2\)) metric value. When this threshold is met or exceeded, H2O stops making trees. 
 
-- **Seed**: Specify the random number generator (RNG) seed for algorithm components dependent on randomization. The seed is consistent for each H2O instance so that you can create models with the same starting conditions in alternative configurations. 
+- **Build\_tree\_one\_node**: To run on a single node, check this checkbox. This is suitable for small datasets as there is no network overhead but fewer CPUs are used. 
+
+- **Binomial\_double\_trees**: (Binary classification only) Build twice as many trees (one per class). Enabling this option can lead to higher accuracy, while disabling can result in faster model building. This option is disabled by default. 
+
+- **Keep\_cross\_validation\_splits**: To keep the cross-validation frames, check this checkbox. 
+
+- **Fold_assignment**: (Applicable only if a value for **nfolds** is specified and **fold_column** is not selected) Select the cross-validation fold assignment scheme. The available options are Random or Modulo. 
+
+- **Class\_sampling\_factors**: Specify the per-class (in lexicographical order) over/under-sampling ratios. By default, these ratios are automatically computed during training to obtain the class balance.  
+
+- **Max\_after\_balance\_size**: Specify the maximum relative size of the training data after balancing class counts (**balance\_classes** must be enabled). The value can be less than 1.0. 
 
 
 ###Interpreting a DRF Model
@@ -457,8 +503,7 @@ By default, the following output displays:
 ###DRF Algorithm 
 
 
-<iframe src="http://www.slideshare.net/slideshow/embed_code/20546878" width="427" height="356" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" style="border:1px solid #CCC;border-width:1px 1px 0;margin-bottom:5px" allowfullscreen> </iframe> <div style="margin-bottom:5px"> <strong> <a href="https://www.slideshare.net/0xdata/jan-vitek-distributedrandomforest522013" title="Jan vitek distributedrandomforest_5-2-2013" target="_blank">Jan vitek distributedrandomforest_5-2-2013</a> </strong> from <strong><a href="http://www.slideshare.net/0xdata" target="_blank">0xdata</a></strong></div>
-
+<iframe src="//www.slideshare.net/slideshow/embed_code/key/tASzUyJ19dtJsQ" width="425" height="355" frameborder="0" marginwidth="0" marginheight="0" scrolling="no" style="border:1px solid #CCC; border-width:1px; margin-bottom:5px; max-width: 100%;" allowfullscreen> </iframe> <div style="margin-bottom:5px"> <strong> <a href="//www.slideshare.net/0xdata/rf-brighttalk" title="Building Random Forest at Scale" target="_blank">Building Random Forest at Scale</a> </strong> from <strong><a href="//www.slideshare.net/0xdata" target="_blank">Sri Ambati</a></strong> </div>
 
 ###References
 
@@ -473,28 +518,32 @@ Naïve Bayes (NB) is a classification algorithm that relies on strong assumption
 
 ###Defining a Naïve Bayes Model
 
-- **Destination\_key**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
+- **Model_id**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
 
 - **Training_frame**: (Required) Select the dataset used to build the model. 
 **NOTE**: If you click the **Build a model** button from the `Parse` cell, the training frame is entered automatically. 
 
 - **Validation_frame**: (Optional) Select the dataset used to evaluate the accuracy of the model. 
 
-- **Ignored_columns**: (Optional) Click the plus sign next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Add all** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Clear all** button. 
-
-- **Drop\_na20\_cols**: (Optional) Check this checkbox to omit columns that have at least 20% missing values.
-
 - **Response_column**: (Required) Select the column to use as the independent variable.
 
-- **Laplace**: Specify the Laplace smoothing parameter. The default value is 0. 
+- **Ignored_columns**: (Optional) Click the checkbox next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Select All** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Deselect All** button. To search for a specific column, type the column name in the **Search** field above the column list. To only show columns with a specific percentage of missing values, specify the percentage in the **Only show columns with more than 0% missing values** field. To change the selections for the hidden columns, use the **Select Visible** or **Deselect Visible** buttons. 
 
-- **Min\_sdev**: Specify the minimum standard deviation to use for observations without enough data. The default value is 0.001. 
+- **Ignore\_const\_cols**: Check this checkbox to ignore constant training columns, since no information can be gained from them. This option is selected by default. 
 
-- **Eps\_sdev**: Specify the threshold for standard deviation. If this threshold is not met, the **min\_sdev** value is used. The default value is 1e-10. 
+- **Laplace**: Specify the Laplace smoothing parameter.  
 
-- **Min\_prob**: Specify the minimum probability to use for observations without enough data. The default value is 0.001. 
+- **Min\_sdev**: Specify the minimum standard deviation to use for observations without enough data.   
 
-- **Eps\_prob**: Specify the threshold for standard deviation. If this threshold is not met, the **min\_sdev** value is used. The default value is 1e-10. 
+- **Eps\_sdev**: Specify the threshold for standard deviation. If this threshold is not met, the **min\_sdev** value is used.  
+
+- **Min\_prob**: Specify the minimum probability to use for observations without enough data.   
+
+- **Eps\_prob**: Specify the threshold for standard deviation. If this threshold is not met, the **min\_sdev** value is used.  
+
+- **Compute_metrics**: To compute metrics on training data, check this checkbox. The Naïve Bayes classifier assumes independence between predictor variables conditional on the response, and a Gaussian distribution of numeric predictors with mean and standard deviation computed from the training dataset. When building a Naïve Bayes classifier, every row in the training dataset that contains at least one NA will be skipped completely. If the test dataset has missing values, then those predictors are omitted in the probability calculation during prediction.
+
+- **Score\_each\_iteration**: (Optional) Check this checkbox to score during each iteration of the model training. 
 
 - **Max\_confusion\_matrix\_size**: Specify the maximum size (in number of classes) for confusion matrices to be printed in the Logs. 
 
@@ -569,37 +618,37 @@ The algorithm is presented for the simplified binomial case without loss of gene
 
 Under the Naive Bayes assumption of independence, given a training set
 for a set of discrete valued features X 
-$${(X^{(i)},\ y^{(i)};\ i=1,...m)}$$
+\({(X^{(i)},\ y^{(i)};\ i=1,...m)}\)
 
 The joint likelihood of the data can be expressed as: 
 
-$$\mathcal{L} \: (\phi(y),\: \phi_{i|y=1},\:\phi_{i|y=0})=\Pi_{i=1}^{m} p(X^{(i)},\: y^{(i)})$$
+\(\mathcal{L} \: (\phi(y),\: \phi_{i|y=1},\:\phi_{i|y=0})=\Pi_{i=1}^{m} p(X^{(i)},\: y^{(i)})\)
 
 The model can be parameterized by:
 
-$$\phi_{i|y=0}=\ p(x_{i}=1|\ y=0);\: \phi_{i|y=1}=\ p(x_{i}=1|y=1);\: \phi(y)$$
+\(\phi_{i|y=0}=\ p(x_{i}=1|\ y=0);\: \phi_{i|y=1}=\ p(x_{i}=1|y=1);\: \phi(y)\)
 
-Where $$\phi_{i|y=0}=\ p(x_{i}=1|\ y=0)$$ can be thought of as the fraction of the observed instances where feature $$x_{i}$$ is observed, and the outcome is $$y=0, \phi_{i|y=1}=p(x_{i}=1|\ y=1)$$ is the fraction of the observed instances where feature $$x_{i}$$ is observed, and the outcome is $$y=1$$, and so on.
+Where \(\phi_{i|y=0}=\ p(x_{i}=1|\ y=0)\) can be thought of as the fraction of the observed instances where feature \(x_{i}\) is observed, and the outcome is \(y=0, \phi_{i|y=1}=p(x_{i}=1|\ y=1)\) is the fraction of the observed instances where feature \(x_{i}\) is observed, and the outcome is \(y=1\), and so on.
 
 The objective of the algorithm is to maximize with respect to
-$$\phi_{i|y=0}, \ \phi_{i|y=1},\ and \ \phi(y)$$
+\(\phi_{i|y=0}, \ \phi_{i|y=1},\ and \ \phi(y)\)
 
 Where the maximum likelihood estimates are: 
 
-$$\phi_{j|y=1}= \frac{\Sigma_{i}^m 1(x_{j}^{(i)}=1 \ \bigcap y^{i} = 1)}{\Sigma_{i=1}^{m}(y^{(i)}=1}$$
+\(\phi_{j|y=1}= \frac{\Sigma_{i}^m 1(x_{j}^{(i)}=1 \ \bigcap y^{i} = 1)}{\Sigma_{i=1}^{m}(y^{(i)}=1}\)
 
-$$\phi_{j|y=0}= \frac{\Sigma_{i}^m 1(x_{j}^{(i)}=1 \ \bigcap y^{i} = 0)}{\Sigma_{i=1}^{m}(y^{(i)}=0}$$
+\(\phi_{j|y=0}= \frac{\Sigma_{i}^m 1(x_{j}^{(i)}=1 \ \bigcap y^{i} = 0)}{\Sigma_{i=1}^{m}(y^{(i)}=0}\)
 
-$$\phi(y)= \frac{(y^{i} = 1)}{m}$$
+\(\phi(y)= \frac{(y^{i} = 1)}{m}\)
 
 
-Once all parameters $$\phi_{j|y}$$ are fitted, the model can be used to predict new examples with features $$X_{(i^*)}$$. 
+Once all parameters \(\phi_{j|y}\) are fitted, the model can be used to predict new examples with features \(X_{(i^*)}\). 
 
 This is carried out by calculating: 
 
-$$p(y=1|x)=\frac{\Pi p(x_i|y=1) p(y=1)}{\Pi p(x_i|y=1)p(y=1) \: +\: \Pi p(x_i|y=0)p(y=0)}$$
+\(p(y=1|x)=\frac{\Pi p(x_i|y=1) p(y=1)}{\Pi p(x_i|y=1)p(y=1) \: +\: \Pi p(x_i|y=0)p(y=0)}\)
 
-$$p(y=0|x)=\frac{\Pi p(x_i|y=0) p(y=0)}{\Pi p(x_i|y=1)p(y=1) \: +\: \Pi p(x_i|y=0)p(y=0)}$$
+\(p(y=0|x)=\frac{\Pi p(x_i|y=0) p(y=0)}{\Pi p(x_i|y=1)p(y=1) \: +\: \Pi p(x_i|y=0)p(y=0)}\)
 
 and predicting the class with the highest probability. 
 
@@ -609,9 +658,9 @@ It is possible that prediction sets contain features not originally seen in the 
 Laplace smoothing allows a model to predict on out of training data features by adjusting the maximum likelihood estimates to be: 
 
 
-$$\phi_{j|y=1}= \frac{\Sigma_{i}^m 1(x_{j}^{(i)}=1 \ \bigcap y^{i} = 1) \: + \: 1}{\Sigma_{i=1}^{m}(y^{(i)}=1 \: + \: 2}$$
+\(\phi_{j|y=1}= \frac{\Sigma_{i}^m 1(x_{j}^{(i)}=1 \ \bigcap y^{i} = 1) \: + \: 1}{\Sigma_{i=1}^{m}(y^{(i)}=1 \: + \: 2}\)
 
-$$\phi_{j|y=0}= \frac{\Sigma_{i}^m 1(x_{j}^{(i)}=1 \ \bigcap y^{i} = 0) \: + \: 1}{\Sigma_{i=1}^{m}(y^{(i)}=0 \: + \: 2}$$
+\(\phi_{j|y=0}= \frac{\Sigma_{i}^m 1(x_{j}^{(i)}=1 \ \bigcap y^{i} = 0) \: + \: 1}{\Sigma_{i=1}^{m}(y^{(i)}=0 \: + \: 2}\)
 
 Note that in the general case where y takes on k values, there are k+1 modified parameter estimates, and they are added in when the denominator is k (rather than two, as shown in the two-level classifier shown here.)
 
@@ -630,9 +679,6 @@ Laplace smoothing should be used with care; it is generally intended to allow fo
 <a name="PCA"></a>
 ##PCA
 
-  >PCA is currently in progress in H2O-Dev. Once implementation of this algorithm is complete, this section of the document will be updated. 
-
-<!---
 ###Introduction
 
 Principal Components Analysis (PCA) is closely related to Principal Components Regression. The algorithm is carried out on a set of possibly collinear features and performs a transformation to produce a new set of uncorrelated features.
@@ -641,16 +687,25 @@ PCA is commonly used to model without regularization or perform dimensionality r
 
 ###Defining a PCA Model
 
-- **Destination\_key**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
+- **Model_id**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
 
 - **Training_frame**: (Required) Select the dataset used to build the model. 
 **NOTE**: If you click the **Build a model** button from the `Parse` cell, the training frame is entered automatically. 
 
 - **Validation_frame**: (Optional) Select the dataset used to evaluate the accuracy of the model. 
 
-- **Ignored_columns**: (Optional) Click the plus sign next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Add all** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Clear all** button. 
+- **Ignored_columns**: (Optional) Click the checkbox next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Select All** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Deselect All** button. To search for a specific column, type the column name in the **Search** field above the column list. To only show columns with a specific percentage of missing values, specify the percentage in the **Only show columns with more than 0% missing values** field. To change the selections for the hidden columns, use the **Select Visible** or **Deselect Visible** buttons.
 
-- **Drop\_na20\_cols**: (Optional) Check this checkbox to omit columns that have at least 20% missing values.
+- **Ignore\_const\_cols**: Check this checkbox to ignore constant training columns, since no information can be gained from them. This option is selected by default.   
+
+- **PCA_method**: Select the algorithm to use for computing the principal components: 
+	- *GramSVD*: Uses a distributed computation of the Gram matrix, followed by a local SVD using the JAMA package
+	- *Power*: Computes the SVD using the power iteration method
+	- *GLRM*: Fits a generalized low-rank model with L2 loss function and no regularization and solves for the SVD using local matrix algebra
+
+- **Use\_all\_factor\_levels**: Check this checkbox to use all factor levels in the possible set of predictors; if you enable this option, sufficient regularization is required. By default, the first factor level is skipped. For PCA models, this option ignores the first factor level of each categorical column when expanding into indicator columns. 
+
+- **Loading_name**: (Applicable only if *Power* is selected for **PCA_method**) Specify a name for the frame to save left singular vectors from SVD. 
 
 - **Score\_each\_iteration**: (Optional) Check this checkbox to score during each iteration of the model training. 
 
@@ -658,22 +713,14 @@ PCA is commonly used to model without regularization or perform dimensionality r
 
 - **K**: Specify the rank of matrix approximation. The default is 1.  
 
-- **Gamma**: Specify the regularization weight for PCA. The default is 0. 
-
 - **Max_iterations**: Specify the number of training iterations. The default is 1000.
 
 - **Seed**: Specify the random number generator (RNG) seed for algorithm components dependent on randomization. The seed is consistent for each H2O instance so that you can create models with the same starting conditions in alternative configurations. 
 
-- **Init**: Select the initialization mode. The options are PlusPlus or User. 
-**Note**: If PlusPlus is selected, the initial Y matrix is chosen by the final cluster centers from the PlusPlus algorithm. 
-
-- **User_points**: Specify the initial Y matrix. 
-**Note**: The **User_points** parameter should only be used by advanced users for testing purposes.  
-
 
 ###Interpreting a PCA Model
 
-PCA output returns a table displaying the number of components indicated by whichever criteria was more restrictive in this particular case. In this example, a maximum of 100 components were requested, and a tolerance set to .5.
+PCA output returns a table displaying the number of components specified by the value for `k`.
 
 Scree and cumulative variance plots for the components are returned as well. Users can access them by clicking on the black button labeled "Scree and Variance Plots" at the top left of the results page. A scree plot shows the variance of each component, while the cumulative variance plot shows the total variance accounted for by the set of components.
 
@@ -690,17 +737,46 @@ The output for PCA includes the following:
 
 ###FAQ
 
-- How does the algo handle missing values during training?
-- How does the algo handle missing values during testing?
-- What happens during prediction if the new sample has categorical levels not seen in training?
-- Does it matter if the data is sorted? 
-- Should data be shuffled before training?
-- What if there are a large number of columns?
-- What if there are a large number of categorical factor levels?
+- **How does the algorithm handle missing values during scoring?**
+
+For the GramSVD and Power methods, all rows containing missing values are ignored during training. For the GLRM method, missing values are excluded from the sum over the loss function in the objective. For more information, refer to section 4 Generalized Loss Functions, equation (13), in ["Generalized Low Rank Models"](https://web.stanford.edu/~boyd/papers/pdf/glrm.pdf) by Boyd et al.
+
+  
+- **How does the algorithm handle missing values during testing?**
+
+  During scoring, the test data is right-multiplied by the eigenvector matrix produced by PCA. Missing categorical values are skipped in the row product-sum. Missing numeric values propagate an entire row of NAs in the resulting projection matrix.
+
+
+- **What happens during prediction if the new sample has categorical levels not seen in training?**
+
+  Categorical levels in the test data not present in the training data are skipped in the row product-sum.
+
+
+- **Does it matter if the data is sorted?**
+  
+  No, sorting data does not affect the model. 
+  
+- **Should data be shuffled before training?**
+
+  No, shuffling data does not affect the model. 
+
+
+- **What if there are a large number of columns?**
+
+  Calculating the SVD will be slower, since computations on the Gram matrix are handled locally. 
+
+- **What if there are a large number of categorical factor levels?**
+
+  Each factor level (with the exception of the first, depending on whether **use\_all\_factor\_levels** is enabled) is assigned an indicator column. The indicator column is 1 if the observation corresponds to a particular factor; otherwise, it is 0. As a result, many factor levels result in a large Gram matrix and slower computation of the SVD. 
+
+- **How are categorical columns handled during model building?**
+  
+  If the GramSVD or Power methods are used, the categorical columns are expanded into 0/1 indicator columns for each factor level. The algorithm is then performed on this expanded training frame. For GLRM, the multidimensional loss function for categorical columns is discussed in Section 6.1 of ["Generalized Low Rank Models"](https://web.stanford.edu/~boyd/papers/pdf/glrm.pdf) by Boyd et al. 
+
 
 ###PCA Algorithm
 
-Let $$X$$ be an $$M\times N$$ matrix where
+Let \(X\) be an \(M\times N\) matrix where
  
 - Each row corresponds to the set of all measurements on a particular 
    attribute, and 
@@ -708,41 +784,100 @@ Let $$X$$ be an $$M\times N$$ matrix where
 - Each column corresponds to a set of measurements from a given
    observation or trial
 
-The covariance matrix $$C_{x}$$ is
+The covariance matrix \(C_{x}\) is
 
-$$C_{x}=\frac{1}{n}XX^{T}$$
+\(C_{x}=\frac{1}{n}XX^{T}\)
 
-where $$n$$ is the number of observations. 
+where \(n\) is the number of observations. 
 
-$$C_{x}$$ is a square, symmetric $$m\times m$$ matrix, the diagonal entries of which are the variances of attributes, and the off-diagonal entries are covariances between attributes. 
+\(C_{x}\) is a square, symmetric \(m\times m\) matrix, the diagonal entries of which are the variances of attributes, and the off-diagonal entries are covariances between attributes. 
+
+PCA convergence is based on the method described by Gockenbach: "The rate of convergence of the power method depends on the ratio \(lambda_2|/|\lambda_1\). If this is small...then the power method converges rapidly. If the ratio is close to 1, then convergence is quite slow. The power method will fail if \(lambda_2| = |\lambda_1\)." (567). 
+
 
 The objective of PCA is to maximize variance while minimizing covariance. 
 
-To accomplish this, for a new matrix $$C_{y}$$ with off diagonal entries of 0, and each successive dimension of Y ranked according to variance, PCA finds an orthonormal matrix $$P$$ such that $$Y=PX$$ constrained by the requirement that $$C_{y}=\frac{1}{n}YY^{T}$$ be a diagonal matrix. 
+To accomplish this, for a new matrix \(C_{y}\) with off diagonal entries of 0, and each successive dimension of Y ranked according to variance, PCA finds an orthonormal matrix \(P\) such that \(Y=PX\) constrained by the requirement that \(C_{y}=\frac{1}{n}YY^{T}\) be a diagonal matrix. 
 
-The rows of $$P$$ are the principal components of X.
+The rows of \(P\) are the principal components of X.
 
-$$C_{y}=\frac{1}{n}YY^{T}$$
-$$=\frac{1}{n}(PX)(PX)^{T}$$
-$$C_{y}=PC_{x}P^{T}.$$
+\(C_{y}=\frac{1}{n}YY^{T}\)
+\(=\frac{1}{n}(PX)(PX)^{T}\)
+\(C_{y}=PC_{x}P^{T}.\)
 
-Because any symmetric matrix is diagonalized by an orthogonal matrix of its eigenvectors, solve matrix $$P$$ to be a matrix where each row is an eigenvector of 
-$$\frac{1}{n}XX^{T}=C_{x}$$
+Because any symmetric matrix is diagonalized by an orthogonal matrix of its eigenvectors, solve matrix \(P\) to be a matrix where each row is an eigenvector of 
+\(\frac{1}{n}XX^{T}=C_{x}\)
 
-Then the principal components of $$X$$ are the eigenvectors of $$C_{x}$$, and the $$i^{th}$$ diagonal value of $$C_{y}$$ is the variance of $$X$$ along $$p_{i}$$. 
+Then the principal components of \(X\) are the eigenvectors of \(C_{x}\), and the \(i^{th}\) diagonal value of \(C_{y}\) is the variance of \(X\) along \(p_{i}\). 
 
-Eigenvectors of $$C_{x}$$ are found by first finding the eigenvalues $$\lambda$$ of $$C_{x}$$.
+Eigenvectors of \(C_{x}\) are found by first finding the eigenvalues \(\lambda\) of \(C_{x}\).
 
-For each eigenvalue $$\lambda$$ $$(C-{x}-\lambda I)x =0$$ where $$x$$ is the eigenvector associated with $$\lambda$$. 
+For each eigenvalue \(\lambda\) \((C-{x}-\lambda I)x =0\) where \(x\) is the eigenvector associated with \(\lambda\). 
 
-Solve for $$x$$ by Gaussian elimination. 
+Solve for \(x\) by Gaussian elimination. 
+
+####Recovering SVD from GLRM
+
+GLRM gives \(x\)  and \(y\), where \(x \in \rm \Bbb I \!\Bbb R ^{n * k}\) and \( y \in \rm \Bbb I \!\Bbb R ^{k*m} \)
+
+&nbsp;&nbsp;&nbsp;- \(n\)= number of rows (A)
+
+&nbsp;&nbsp;&nbsp;- \(m\)= number of columns (A)
+
+&nbsp;&nbsp;&nbsp;- \(k\)= user-specified rank
+&nbsp;&nbsp;&nbsp;- \(A\)= training matrix
+
+It is assumed that the \(x\) and \(y\) columns are independent. 
+
+First, perform QR decomposition of \(x\) and \(y^T\): 
+
+&nbsp;&nbsp;&nbsp;\(x = QR\) 
+
+&nbsp;&nbsp;&nbsp; \(y^T = ZS\), where \(Q^TQ = I = Z^TZ\)
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Call JAMA QR Decomposition directly on \(y^T\) to get \( Z \in \rm \Bbb I \! \Bbb R\), \( S \in \Bbb I \! \Bbb R \)
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\( R \) from QR decomposition of \( x \) is the upper triangular factor of Cholesky of \(X^TX\) Gram
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\( X^TX = LL^T, X = QR \)
+
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;\( X^TX= (R^TQ^T) QR = R^TR \), since \(Q^TQ=I \) => \(R=L^T\) (transpose lower triangular)
+
+**Note**: In code, \(X^TX \over n\) = \( LL^T \)
+
+&nbsp;&nbsp;&nbsp;\( X^TX = (L \sqrt{n})(L \sqrt{n})^T =R^TR \)
+
+&nbsp;&nbsp;&nbsp;\( R = L^T \sqrt{n} \in \rm \Bbb I \! \Bbb R^{k * k} \) reduced QR decomposition. 
+
+For more information, refer to the [Rectangular matrix](https://en.wikipedia.org/wiki/QR_decomposition#Rectangular_matrix) section of "QR Decomposition" on Wikipedia. 
+
+\( XY = QR(ZS)^T = Q(RS^T)Z^T \)
+
+**Note**: \( (RS^T) \in \rm \Bbb I \!\Bbb R \)
+
+Find SVD (locally) of \( RS^T \)
+
+\( RS^T = U \sum V^T, U^TU = I = V^TV \) orthogonal 
+
+\( XY = Q(RS^T)Z^T = (QU \sum (V^T Z^T) SVD \)
+
+&nbsp;&nbsp;&nbsp;\( (QU)^T(QU) = U^T Q^TQU U^TU = I\)
+
+&nbsp;&nbsp;&nbsp;\( (ZV)^T(ZV) = V^TZ^TZV = V^TV =I \)
+
+Right singular vectors: \( ZV \in \rm \Bbb I \!\Bbb R^{m * k} \)
+
+Singular values: \( \sum \in \rm \Bbb I \!\Bbb R^{k * k} \) diagonal
+
+Left singular vectors: \( (QU) \in \rm \Bbb I \!\Bbb R^{n * k}\)
 
 
 
 ###References
 
-  >Any references for PCA??)
--->
+Gockenbach, Mark S. "Finite-Dimensional Linear Algebra (Discrete Mathematics and Its Applications)." (2010): 566-567. 
+
+
 ---
 
 <a name="GBM"></a>
@@ -754,40 +889,65 @@ Gradient Boosted Regression and Gradient Boosted Classification are forward lear
 
 ###Defining a GBM Model
 
-- **Destination\_key**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
+- **Model_id**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
 
 - **Training_frame**: (Required) Select the dataset used to build the model. 
 **NOTE**: If you click the **Build a model** button from the `Parse` cell, the training frame is entered automatically. 
 
 - **Validation_frame**: (Optional) Select the dataset used to evaluate the accuracy of the model. 
 
-- **Ignored_columns**: (Optional) Click the plus sign next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Add all** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Clear all** button. 
+- **Nfolds**: Specify the number of folds for cross-validation. 
 
-- **Drop\_na20\_cols**: (Optional) Check this checkbox to omit columns that have at least 20% missing values.
+- **Fold_column**: Select the column that contains the cross-validation fold index assignment per observation. 
 
-- **Score\_each\_iteration**: (Optional) Check this checkbox to score during each iteration of the model training. 
 - **Response_column**: (Required) Select the column to use as the independent variable.
 
-- **Ntrees**: Specify the number of trees. The default value is 50. 
+- **Ignored_columns**: (Optional) Click the checkbox next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Select All** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Deselect All** button. To search for a specific column, type the column name in the **Search** field above the column list. To only show columns with a specific percentage of missing values, specify the percentage in the **Only show columns with more than 0% missing values** field. To change the selections for the hidden columns, use the **Select Visible** or **Deselect Visible** buttons. 
 
-- **Max\_depth**: Specify the maximum tree depth.  The default value is 5. 
+- **Ignore\_const\_cols**: Check this checkbox to ignore constant training columns, since no information can be gained from them. This option is selected by default. 
 
-- **Min\_rows**: Specify the minimum number of observations for a leaf (`nodesize` in R). The default value is 10. 
-- **Nbins**: Specify the number of bins for the histogram. The default value is 20. 
+- **Offset_column**: Select a column to use as the offset. 
+	>*Note*: Offsets are per-row "bias values" that are used during model training. For Gaussian distributions, they can be seen as simple corrections to the response (y) column. Instead of learning to predict the response (y-row), the model learns to predict the (row) offset of the response column. For other distributions, the offset corrections are applied in the linearized space before applying the inverse link function to get the actual response values. For more information, refer to the following [link](http://www.idg.pl/mirrors/CRAN/web/packages/gbm/vignettes/gbm.pdf). 
 
-- **Learn_rate**: Specify the learning rate. The range is 0.0 to 1.0 and the default is 0.1. 
+- **Weights_column**: Select a column to use for the observation weights, which are used for bias correction.
+	>*Note*: Weights are per-row observation weights. This is typically the number of times a row is repeated, but non-integer values are supported as well. During training, rows with higher weights matter more, due to the larger loss function pre-factor.  
 
-- **Distribution**: Select the loss function. The options are auto, bernoulli, multinomial, or gaussian and the default is auto.  
+- **Ntrees**: Specify the number of trees.  
 
-- **Balance_classes**: Oversample the minority classes to balance the class distribution. This option is not selected by default. This option is only applicable for classification. Majority classes can be undersampled to satisfy the Max\_after\_balance\_size parameter.
+- **Max\_depth**: Specify the maximum tree depth.  
+
+- **Min\_rows**: Specify the minimum number of observations for a leaf (`nodesize` in R).   
+
+- **Nbins**: (Numerical/real/int only) Specify the number of bins for the histogram to build, then split at the best point.  
+
+- **Nbins_cats**: (Categorical/enums only) Specify the number of bins for the histogram to build, then split at the best point. Higher values can lead to more overfitting.   
+
+- **Seed**: Specify the random number generator (RNG) seed for algorithm components dependent on randomization. The seed is consistent for each H2O instance so that you can create models with the same starting conditions in alternative configurations. 
+
+- **Learn_rate**: Specify the learning rate. The range is 0.0 to 1.0. 
+
+- **Distribution**: Select the loss function. The options are auto, bernoulli, multinomial, gaussian, poisson, gamma, or tweedie.  
+
+- **Score\_each\_iteration**: (Optional) Check this checkbox to score during each iteration of the model training. 
+
+- **Balance_classes**: Oversample the minority classes to balance the class distribution. This option is not selected by default. This option is only applicable for classification. Majority classes can be undersampled to satisfy the **Max\_after\_balance\_size** parameter.
 
 - **Max\_confusion\_matrix\_size**: Specify the maximum size (in number of classes) for confusion matrices to be printed in the Logs. 
 
 - **Max\_hit\_ratio\_k**: Specify the maximum number (top K) of predictions to use for hit ratio computation. Applicable to multi-class only. To disable, enter 0. 
 
+- **R2_stopping**: Specify a threshold for the coefficient of determination (\(r^2\)) metric value. When this threshold is met or exceeded, H2O stops making trees.   
+
+- **Build\_tree\_one\_node**: To run on a single node, check this checkbox. This is suitable for small datasets as there is no network overhead but fewer CPUs are used.
+
+- **Keep\_cross\_validation\_splits**: To keep the cross-validation frames, check this checkbox. 
+
+- **Fold_assignment**: (Applicable only if a value for **nfolds** is specified and **fold_column** is not selected) Select the cross-validation fold assignment scheme. The available options are Random or Modulo. 
+ 
 - **Class\_sampling\_factors**: Specify the per-class (in lexicographical order) over/under-sampling ratios. By default, these ratios are automatically computed during training to obtain the class balance. There is no default value. 
 
-- **Seed**: Specify the random number generator (RNG) seed for algorithm components dependent on randomization. The seed is consistent for each H2O instance so that you can create models with the same starting conditions in alternative configurations. 
+- **Max\_after\_balance\_size**: Specify the maximum relative size of the training data after balancing class counts (**balance\_classes** must be enabled). The value can be less than 1.0. 
+
 
 ###Interpreting a GBM Model
 
@@ -841,21 +1001,30 @@ The output for GBM includes the following:
 H2O's Gradient Boosting Algorithms follow the algorithm specified by Hastie et al (2001):
 
 
-Initialize $$f_{k0} = 0,\: k=1,2,…,K$$
+Initialize \(f_{k0} = 0,\: k=1,2,…,K\)
 
-For $$m=1$$ to $$M:$$
+For \(m=1\) to \(M:\)
   
-   &nbsp;&nbsp;(a) Set $$p_{k}(x)=\frac{e^{f_{k}(x)}}{\sum_{l=1}^{K}e^{f_{l}(x)}},\:k=1,2,…,K$$
+   &nbsp;&nbsp;(a) Set \(p_{k}(x)=\frac{e^{f_{k}(x)}}{\sum_{l=1}^{K}e^{f_{l}(x)}},\:k=1,2,…,K\)
 
-   &nbsp;&nbsp;(b) For $$k=1$$ to $$K$$:
+   &nbsp;&nbsp;(b) For \(k=1\) to \(K\):
 
-   &nbsp;&nbsp;&nbsp;&nbsp;i. Compute $$r_{ikm}=y_{ik}-p_{k}(x_{i}),\:i=1,2,…,N.$$
-	&nbsp;&nbsp;&nbsp;&nbsp;ii. Fit a regression tree to the targets $$r_{ikm},\:i=1,2,…,N$$, giving terminal regions $$R_{jim},\:j=1,2,…,J_{m}.$$
-   $$iii. Compute$$ $$\gamma_{jkm}=\frac{K-1}{K}\:\frac{\sum_{x_{i}\in R_{jkm}}(r_{ikm})}{\sum_{x_{i}\in R_{jkm}}|r_{ikm}|(1-|r_{ikm})},\:j=1,2,…,J_{m}.$$
-	$$\:iv.\:Update\:f_{km}(x)=f_{k,m-1}(x)+\sum_{j=1}^{J_{m}}\gamma_{jkm}I(x\in\:R_{jkm}).$$	      
+   &nbsp;&nbsp;&nbsp;&nbsp;i. Compute \(r_{ikm}=y_{ik}-p_{k}(x_{i}),\:i=1,2,…,N.\)
+	&nbsp;&nbsp;&nbsp;&nbsp;ii. Fit a regression tree to the targets \(r_{ikm},\:i=1,2,…,N\), giving terminal regions \(R_{jim},\:j=1,2,…,J_{m}.\)
+   \(iii. Compute\) \(\gamma_{jkm}=\frac{K-1}{K}\:\frac{\sum_{x_{i}\in R_{jkm}}(r_{ikm})}{\sum_{x_{i}\in R_{jkm}}|r_{ikm}|(1-|r_{ikm})},\:j=1,2,…,J_{m}.\)
+	\(\:iv.\:Update\:f_{km}(x)=f_{k,m-1}(x)+\sum_{j=1}^{J_{m}}\gamma_{jkm}I(x\in\:R_{jkm}).\)	      
 
-Output $$\:\hat{f_{k}}(x)=f_{kM}(x),\:k=1,2,…,K.$$ 
+Output \(\:\hat{f_{k}}(x)=f_{kM}(x),\:k=1,2,…,K.\) 
 
+Be aware that the column type affects how the histogram is created and the column type depends on whether rows are excluded or assigned a weight of 0. For example:
+
+val weight
+1      1
+0.5    0
+5      1
+3.5    0
+
+The above vec has a real-valued type if passed as a whole, but if the zero-weighted rows are sliced away first, the integer weight is used. The resulting histogram is either kept at full `nbins` resolution or potentially shrunk to the discrete integer range, which affects the split points. 
 
 ###References
 
@@ -895,80 +1064,94 @@ H2O’s Deep Learning is based on a multi-layer feed-forward artificial neural n
 
 H2O Deep Learning models have many input parameters, many of which are only accessible via the expert mode. For most cases, use the default values. Please read the following instructions before building extensive Deep Learning models. The application of grid search and successive continuation of winning models via checkpoint restart is highly recommended, as model performance can vary greatly.
 
-- **Destination\_key**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
+- **Model_id**: (Optional) Enter a custom name for the model to use as a reference. By default, H2O automatically generates a destination key. 
 
 - **Training_frame**: (Required) Select the dataset used to build the model. 
 **NOTE**: If you click the **Build a model** button from the `Parse` cell, the training frame is entered automatically. 
 
 - **Validation_frame**: (Optional) Select the dataset used to evaluate the accuracy of the model. 
 
-- **Ignored_columns**: (Optional) Click the plus sign next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Add all** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Clear all** button. 
+- **Nfolds**: Specify the number of folds for cross-validation. 
 
-- **Drop\_na20\_cols**: (Optional) Check this checkbox to omit columns that have at least 20% missing values.
+- **Fold_column**: Select the column that contains the cross-validation fold index assignment per observation. 
 
 - **Response_column**: Select the column to use as the independent variable.
 
-- **Activation**: Select the activation function (Tahn, Tahn with dropout, Rectifier, Rectifier with dropout, Maxout, Maxout with dropout). The default option is Rectifier. 
+- **Ignored_columns**: (Optional) Click the checkbox next to a column name to add it to the list of columns excluded from the model. To add all columns, click the **Select All** button. To remove a column from the list of ignored columns, click the X next to the column name. To remove all columns from the list of ignored columns, click the **Deselect All** button. To search for a specific column, type the column name in the **Search** field above the column list. To only show columns with a specific percentage of missing values, specify the percentage in the **Only show columns with more than 0% missing values** field. To change the selections for the hidden columns, use the **Select Visible** or **Deselect Visible** buttons. 
 
-- **Hidden**: Specify the hidden layer sizes (e.g., 100,100). The default value is 200,200. 
+- **Ignore\_const\_cols**: Check this checkbox to ignore constant training columns, since no information can be gained from them. This option is selected by default. 
 
-- **Epochs**: Specify the number of times to iterate (stream) the dataset. The value can be a fraction. The default value for DL is 10. 
+- **Weights_column**: Select a column to use for the observation weights, which are used for bias correction.
+	>*Note*: Weights are per-row observation weights. This is typically the number of times a row is repeated, but non-integer values are supported as well. During training, rows with higher weights matter more, due to the larger loss function pre-factor.  
+
+- **Offset_column**: Select a column to use as the offset. 
+	>*Note*: Offsets are per-row "bias values" that are used during model training. For Gaussian distributions, they can be seen as simple corrections to the response (y) column. Instead of learning to predict the response (y-row), the model learns to predict the (row) offset of the response column. For other distributions, the offset corrections are applied in the linearized space before applying the inverse link function to get the actual response values. For more information, refer to the following [link](http://www.idg.pl/mirrors/CRAN/web/packages/gbm/vignettes/gbm.pdf). 
+
+- **Activation**: Select the activation function (Tahn, Tahn with dropout, Rectifier, Rectifier with dropout, Maxout, Maxout with dropout).   
+
+- **Hidden**: Specify the hidden layer sizes (e.g., 100,100).  
+
+- **Epochs**: Specify the number of times to iterate (stream) the dataset. The value can be a fraction.   
 
 - **Variable_importances**: Check this checkbox to compute variable importance. This option is not selected by default. 
 
-- **Balance_classes**: Oversample the minority classes to balance the class distribution. This option is not selected by default. This option is only applicable for classification. Majority classes can be undersampled to satisfy the Max\_after\_balance\_size parameter. 
+- **Balance_classes**: Oversample the minority classes to balance the class distribution. This option is not selected by default. This option is only applicable for classification. Majority classes can be undersampled to satisfy the **Max\_after\_balance\_size** parameter. 
 
 - **Max\_confusion\_matrix\_size**: Specify the maximum size (in number of classes) for confusion matrices to be printed in the Logs. 
 
 - **Max\_hit\_ratio\_k**: Specify the maximum number (top K) of predictions to use for hit ratio computation. Applicable to multi-class only. To disable, enter 0. 
 
-- **Checkpoint**: Enter a model key associated with a previously-trained Deep Learning model. Use this option to build a new model as a continuation of a previously-generated model (e.g., by a grid search).
+- **Checkpoint**: Enter a model key associated with a previously-trained Deep Learning model. Use this option to build a new model as a continuation of a previously-generated model.
 
 - **Use\_all\_factor\_levels**: Check this checkbox to use all factor levels in the possible set of predictors; if you enable this option, sufficient regularization is required. By default, the first factor level is skipped. For Deep Learning models, this option is useful for determining variable importances and is automatically enabled if the autoencoder is selected. 
 
-- **Train\_samples\_per\_iteration**: Specify the number of global training samples per MapReduce iteration. To specify one epoch, enter 0. To specify all available data (e.g., replicated training data), enter -1. To use the automatic values, enter -2. The default is -2. 
+- **Train\_samples\_per\_iteration**: Specify the number of global training samples per MapReduce iteration. To specify one epoch, enter 0. To specify all available data (e.g., replicated training data), enter -1. To use the automatic values, enter -2.   
 
 - **Adaptive_rate**: Check this checkbox to enable the adaptive learning rate (ADADELTA). This option is selected by default. 
 
-- **Input\_dropout\_ratio**: Specify the input layer dropout ratio to improve generalization. Suggested values are 0.1 or 0.2. The default value is 0.
+- **Input\_dropout\_ratio**: Specify the input layer dropout ratio to improve generalization. Suggested values are 0.1 or 0.2.  
 
-- **L1**: Specify the L1 regularization to add stability and improve generalization; sets the value of many weights to 0. The default value is 0. 
+- **L1**: Specify the L1 regularization to add stability and improve generalization; sets the value of many weights to 0. 
 
-- **L2**: Specify the L2 regularization to add stability and improve generalization; sets the value of many weights to smaller values. The default value is 0.
+- **L2**: Specify the L2 regularization to add stability and improve generalization; sets the value of many weights to smaller values. 
 
 - **Loss**:  Select the loss function. The options are automatic, mean square, cross-entropy, Huber, or Absolute and the default value is automatic. 
 
-- **Score_interval**: Specify the shortest time interval (in seconds) to wait between model scoring. The default value is 5.0. 
+- **Score_interval**: Specify the shortest time interval (in seconds) to wait between model scoring.  
 
-- **Score\_training\_samples**: Specify the number of training set samples for scoring. To use all training samples, enter 0. The default value is 10000. 
+- **Score\_training\_samples**: Specify the number of training set samples for scoring. To use all training samples, enter 0.  
 
-- **Score\_duty\_cycle**: Specify the maximum duty cycle fraction for scoring. A lower value results in more training and a higher value results in more scoring. The default value is 0.1.
+- **Score\_duty\_cycle**: Specify the maximum duty cycle fraction for scoring. A lower value results in more training and a higher value results in more scoring. 
 
 - **Autoencoder**: Check this checkbox to enable the Deep Learning autoencoder. This option is not selected by default. **Note**: This option requires **MeanSquare** as the loss function. 
 
-- **Class\_sampling\_factors**: Specify the per-class (in lexicographical order) over/under-sampling ratios. By default, these ratios are automatically computed during training to obtain the class balance. There is no default value. 
+- **Keep\_cross\_validation\_splits**: To keep the cross-validation frames, check this checkbox. 
+
+- **Fold_assignment**: (Applicable only if a value for **nfolds** is specified and **fold_column** is not selected) Select the cross-validation fold assignment scheme. The available options are Random or Modulo. 
+
+- **Class\_sampling\_factors**: Specify the per-class (in lexicographical order) over/under-sampling ratios. By default, these ratios are automatically computed during training to obtain the class balance.  
+
+- **Max\_after\_balance\_size**: Specify the maximum relative size of the training data after balancing class counts (**balance\_classes** must be enabled). The value can be less than 1.0. 
 
 - **Overwrite\_with\_best\_model**: Check this checkbox to overwrite the final model with the best model found during training. This option is selected by default. 
 
-- **Target\_ratio\_comm\_to\_comp**: Specify the target ratio of communication overhead to computation. This option is only enabled for multi-node operation and if **train\_samples\_per\_iteration** equals -2 (auto-tuning). The default value is 0.02. 
+- **Target\_ratio\_comm\_to\_comp**: Specify the target ratio of communication overhead to computation. This option is only enabled for multi-node operation and if **train\_samples\_per\_iteration** equals -2 (auto-tuning).  
 
 - **Seed**: Specify the random number generator (RNG) seed for algorithm components dependent on randomization. The seed is consistent for each H2O instance so that you can create models with the same starting conditions in alternative configurations. 
 
-- **Rho**: Specify the adaptive learning rate time decay factor. The default value is 0.99. 
+- **Rho**: Specify the adaptive learning rate time decay factor.   
 
-- **Epsilon**: Specify the adaptive learning rate time smoothing factor to avoid dividing by zero. The default value is 1e-8. 
+- **Epsilon**: Specify the adaptive learning rate time smoothing factor to avoid dividing by zero. 
 
-- **Max_W2**: Specify the constraint for the squared sum of the incoming weights per unit (e.g., for Rectifier). The default value is infinity. 
+- **Max_W2**: Specify the constraint for the squared sum of the incoming weights per unit (e.g., for Rectifier).  
 
-- **Initial\_weight\_distribution**: Select the initial weight distribution (Uniform Adaptive, Uniform, or Normal). The default is Uniform Adaptive. 
+- **Initial\_weight\_distribution**: Select the initial weight distribution (Uniform Adaptive, Uniform, or Normal).   
 
-- **Regression_stop**: Specify the stopping criterion for regression error (MSE) on the training data. To disable this option, enter -1. The default value is 1.0E-6. 
+- **Regression_stop**: Specify the stopping criterion for regression error (MSE) on the training data. To disable this option, enter -1.  
 
 - **Diagnostics**: Check this checkbox to compute the variable importances for input features (using the Gedeon method). For large networks, selecting this option can reduce speed. This option is selected by default. 
 
 - **Fast_mode**: Check this checkbox to enable fast mode, a minor approximation in back-propagation. This option is selected by default. 
-
-- **Ignore\_const\_cols**: Check this checkbox to ignore constant training columns, since no information can be gained from them. This option is selected by default. 
 
 - **Force\_load\_balance**: Check this checkbox to force extra load balancing to increase training speed for small datasets and use all cores. This option is selected by default. 
 
@@ -976,16 +1159,17 @@ H2O Deep Learning models have many input parameters, many of which are only acce
 
 - **Shuffle\_training\_data**: Check this checkbox to shuffle the training data. This option is recommended if the training data is replicated and the value of **train\_samples\_per\_iteration** is close to the number of nodes times the number of rows. This option is not selected by default. 
 
-- **Missing\_values\_handling**: Select how to handle missing values (skip or mean imputation). The default value is mean imputation. 
+- **Missing\_values\_handling**: Select how to handle missing values (skip or mean imputation).   
 
 - **Quiet_mode**: Check this checkbox to display less output in the standard output. This option is not selected by default. 
 
 - **Sparse**: Check this checkbox to use sparse data handling. This option is not selected by default. 
 
 - **Col_major**: Check this checkbox to use a column major weight matrix for the input layer. This option can speed up forward propagation but may reduce the speed of backpropagation. This option is not selected by default. 
-- **Average_activation**: Specify the average activation for the sparse autoencoder. The default value is 0.0. 
 
-- **Sparsity_beta**: Specify the sparsity regularization. The default value is 0.0. 
+- **Average_activation**: Specify the average activation for the sparse autoencoder.  
+
+- **Sparsity_beta**: Specify the sparsity regularization.   
 
 - **Max\_categorical\_features**: Specify the maximum number of categorical features enforced via hashing.
 

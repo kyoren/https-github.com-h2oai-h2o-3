@@ -47,9 +47,9 @@ public class L_BFGS_Test  extends TestUtil {
       }
 
       @Override
-      public double[] getObjVals(double[] beta, double[] pk, int nSteps, double stepDec) {
+      public double[] getObjVals(double[] beta, double[] pk, int nSteps, double initialStep, double stepDec) {
         double [] res = new double[nSteps];
-        double step = 1;
+        double step = initialStep;
         for(int i = 0; i < res.length; ++i) {
           double x = beta[0] + pk[0]*step;
           double y = beta[1] + pk[1]*step;
@@ -77,7 +77,7 @@ public class L_BFGS_Test  extends TestUtil {
       source.add("CAPSULE", source.remove("CAPSULE"));
       source.remove("ID").remove();
       Frame valid = new Frame(source._names.clone(),source.vecs().clone());
-      dinfo = new DataInfo(Key.make(),source, valid, 1, false, DataInfo.TransformType.STANDARDIZE, DataInfo.TransformType.NONE, true, false);
+      dinfo = new DataInfo(Key.make(),source, valid, 1, false, DataInfo.TransformType.STANDARDIZE, DataInfo.TransformType.NONE, true, false, /* weights */ false, /* offset */ false, /* fold */ false);
       DKV.put(dinfo._key,dinfo);
       GLMGradientSolver solver = new GLMGradientSolver(glmp, dinfo, 1e-5,source.vec("CAPSULE").mean(), source.numRows());
       L_BFGS lbfgs = new L_BFGS().setGradEps(1e-8);
@@ -114,7 +114,7 @@ public class L_BFGS_Test  extends TestUtil {
       GLMParameters glmp = new GLMParameters(Family.gaussian);
       glmp._lambda = new double[]{1e-5};
       glmp._alpha = new double[]{0};
-      dinfo = new DataInfo(Key.make(),source, valid, 1, false, DataInfo.TransformType.STANDARDIZE, DataInfo.TransformType.NONE, true, false);
+      dinfo = new DataInfo(Key.make(),source, valid, 1, false, DataInfo.TransformType.STANDARDIZE, DataInfo.TransformType.NONE, true, false, /* weights */ false, /* offset */ false, /* fold */ false);
       DKV.put(dinfo._key,dinfo);
       GradientSolver solver = new GLMGradientSolver(glmp, dinfo, 1e-5,source.lastVec().mean(), source.numRows());
       L_BFGS lbfgs = new L_BFGS().setMaxIter(20);

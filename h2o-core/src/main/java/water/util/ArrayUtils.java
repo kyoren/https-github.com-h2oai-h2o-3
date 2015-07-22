@@ -4,6 +4,7 @@ import water.MemoryManager;
 
 import java.text.DecimalFormat;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Random;
 
 import static water.util.RandomUtils.getRNG;
@@ -48,7 +49,7 @@ public class ArrayUtils {
     return result;
   }
 
-  public static double l2norm2(double [] x){ return l2norm2(x,false); }
+  public static double l2norm2(double [] x){ return l2norm2(x, false); }
   public static double l2norm2(double [] x, boolean skipLast){
     double sum = 0;
     int last = x.length - (skipLast?1:0);
@@ -56,7 +57,7 @@ public class ArrayUtils {
       sum += x[i]*x[i];
     return sum;
   }
-  public static double l1norm(double [] x){ return l1norm(x,false); }
+  public static double l1norm(double [] x){ return l1norm(x, false); }
   public static double l1norm(double [] x, boolean skipLast){
     double sum = 0;
     int last = x.length -(skipLast?1:0);
@@ -200,17 +201,31 @@ public class ArrayUtils {
     for (int i=0; i<nums.length; i++) nums[i] *= n;
     return nums;
   }
+
   public static double[] multArrVec(double[][] ary, double[] nums) {
     if(ary == null || nums == null) return null;
+    assert ary[0].length == nums.length : "Inner dimensions must match: Got " + ary[0].length + " != " + nums.length;
     double[] res = new double[ary.length];
     for(int i = 0; i < ary.length; i++)
       res[i] = innerProduct(ary[i], nums);
     return res;
   }
 
+  public static double[] multVecArr(double[] nums, double[][] ary) {
+    if(ary == null || nums == null) return null;
+    assert nums.length == ary.length : "Inner dimensions must match: Got " + nums.length + " != " + ary.length;
+    double[] res = new double[ary[0].length];
+    for(int j = 0; j < ary[0].length; j++) {
+      res[j] = 0;
+      for(int i = 0; i < ary.length; i++)
+        res[j] += nums[i] * ary[i][j];
+    }
+    return res;
+  }
+
   public static double[][] multArrArr(double[][] ary1, double[][] ary2) {
     if(ary1 == null || ary2 == null) return null;
-    assert ary1[0].length == ary2.length : "Inner dimensions must match: Got " + ary1[0].length + "!=" + ary2.length;   // Inner dimensions must match
+    assert ary1[0].length == ary2.length : "Inner dimensions must match: Got " + ary1[0].length + " != " + ary2.length;   // Inner dimensions must match
     double[][] res = new double[ary1.length][ary2[0].length];
 
     for(int i = 0; i < ary1.length; i++) {
@@ -230,6 +245,70 @@ public class ArrayUtils {
     for(int i = 0; i < res.length; i++) {
       for(int j = 0; j < res[0].length; j++)
         res[i][j] = ary[j][i];
+    }
+    return res;
+  }
+
+  /**
+   * Given a n by k matrix X, form its Gram matrix
+   * @param x Matrix of real numbers
+   * @param transpose If true, compute n by n Gram of rows = XX'
+   *                  If false, compute k by k Gram of cols = X'X
+   * @return A symmetric positive semi-definite Gram matrix
+   */
+  public static double[][] formGram(double[][] x, boolean transpose) {
+    if (x == null) return null;
+    int dim_in = transpose ? x[0].length : x.length;
+    int dim_out = transpose ? x.length : x[0].length;
+    double[][] xgram = new double[dim_out][dim_out];
+
+    // Compute all entries on and above diagonal
+    if(transpose) {
+      for (int i = 0; i < dim_in; i++) {
+        // Outer product = x[i] * x[i]', where x[i] is col i
+        for (int j = 0; j < dim_out; j++) {
+          for (int k = j; k < dim_out; k++)
+            xgram[j][k] += x[j][i] * x[k][i];
+        }
+      }
+    } else {
+      for (int i = 0; i < dim_in; i++) {
+        // Outer product = x[i]' * x[i], where x[i] is row i
+        for (int j = 0; j < dim_out; j++) {
+          for (int k = j; k < dim_out; k++)
+            xgram[j][k] += x[i][j] * x[i][k];
+        }
+      }
+    }
+
+    // Fill in entries below diagonal since Gram is symmetric
+    for (int i = 0; i < dim_in; i++) {
+      for (int j = 0; j < dim_out; j++) {
+        for (int k = 0; k < j; k++)
+          xgram[j][k] = xgram[k][j];
+      }
+    }
+    return xgram;
+  }
+  public static double[][] formGram(double[][] x) { return formGram(x, false); }
+
+  public static String[] permuteCols(String[] vec, int[] idx) {
+    if(vec == null) return null;
+    assert vec.length == idx.length : "Length of vector must match permutation vector length: Got " + vec.length + " != " + idx.length;
+    String[] res = new String[vec.length];
+
+    for(int i = 0; i < vec.length; i++)
+      res[i] = vec[idx[i]];
+    return res;
+  }
+  public static double[][] permuteCols(double[][] ary, int[] idx) {
+    if(ary == null) return null;
+    assert ary[0].length == idx.length : "Number of columns must match permutation vector length: Got " + ary[0].length + " != " + idx.length;
+    double[][] res = new double[ary.length][ary[0].length];
+
+    for(int j = 0; j < ary[0].length; j++) {
+      for(int i = 0; i < ary.length; i++)
+        res[i][j] = ary[i][idx[j]];
     }
     return res;
   }
@@ -291,6 +370,21 @@ public class ArrayUtils {
   }
 
   public static int maxIndex(float[] from, Random rand) {
+    assert rand != null;
+    int result = 0;
+    int maxCount = 0; // count of maximal element for a 1 item reservoir sample
+    for( int i = 1; i < from.length; ++i ) {
+      if( from[i] > from[result] ) {
+        result = i;
+        maxCount = 1;
+      } else if( from[i] == from[result] ) {
+        if( rand.nextInt(++maxCount) == 0 ) result = i;
+      }
+    }
+    return result;
+  }
+
+  public static int maxIndex(double[] from, Random rand) {
     assert rand != null;
     int result = 0;
     int maxCount = 0; // count of maximal element for a 1 item reservoir sample
@@ -388,7 +482,7 @@ public class ArrayUtils {
 
   private static final DecimalFormat default_dformat = new DecimalFormat("0.#####");
   public static String pprint(double[][] arr){
-    return pprint(arr,default_dformat);
+    return pprint(arr, default_dformat);
   }
   // pretty print Matrix(2D array of doubles)
   public static String pprint(double[][] arr,DecimalFormat dformat) {
@@ -516,7 +610,7 @@ public class ArrayUtils {
 
   public static int[] toInt(String[] a, int off, int len) {
     int[] res = new int[len];
-    for(int i=0; i<len; i++) res[i] = Integer.valueOf(a[off+i]);
+    for(int i=0; i<len; i++) res[i] = Integer.valueOf(a[off + i]);
     return res;
   }
 
@@ -546,7 +640,7 @@ public class ArrayUtils {
     int[] ai = toInt(a, 0, cIinA); Arrays.sort(ai); // extract int part but sort it in numeric order
     int[] bi = toInt(b, 0, cIinB); Arrays.sort(bi);
     String[] ri = toString(union(ai,bi)); // integer part
-    String[] si = union(a,b,cIinA,a.length-cIinA,cIinB,b.length-cIinB,true);
+    String[] si = union(a, b, cIinA, a.length - cIinA, cIinB, b.length - cIinB, true);
     return join(ri, si);
   }
 
@@ -615,6 +709,12 @@ public class ArrayUtils {
   public static final boolean hasNaNsOrInfs(double [] ary){
     for(double d:ary)
       if(Double.isNaN(d) || Double.isInfinite(d))
+        return true;
+    return false;
+  }
+  public static final boolean hasNaNs(double [] ary){
+    for(double d:ary)
+      if(Double.isNaN(d))
         return true;
     return false;
   }
@@ -702,6 +802,17 @@ public class ArrayUtils {
     System.arraycopy(ary,0,nary,1,ary.length);
     return nary;
   }
+  static public <T> T[] copyAndFillOf(T[] original, int newLength, T padding) {
+    if(newLength < 0) throw new NegativeArraySizeException("The array size is negative.");
+    T[] newArray = Arrays.copyOf(original, newLength);
+    if(original.length < newLength) {
+      System.arraycopy(original, 0, newArray, 0, original.length);
+      Arrays.fill(newArray, original.length, newArray.length, padding);
+    } else
+      System.arraycopy(original, 0, newArray, 0, newLength);
+    return newArray;
+
+  }
 
   static public double[] copyAndFillOf(double[] original, int newLength, double padding) {
     if(newLength < 0) throw new NegativeArraySizeException("The array size is negative.");
@@ -760,18 +871,39 @@ public class ArrayUtils {
     return res;
   }
 
-  // Sort an indirection array (ints) without making zillions of Integers.
-  // Painful simple O(n^2) insertion sort, suitable for small arrays only.
-  public interface IntComparator { public int compare(int a, int b); }
-  public static void sort(final int[] data, final IntComparator comparator) {
-    for (int i = 0; i < data.length + 0; i++) {
-      for (int j = i; j > 0 && comparator.compare(data[j - 1], data[j]) > 0; j--) {
-        int tmp = data[j];
-        data[j] = data[j - 1];
-        data[j - 1] = tmp;
+  /**
+   * Sort an integer array of indices based on values
+   * Updates indices in place, keeps values the same
+   * @param idxs indices
+   * @param values values
+   */
+  public static void sort(final int[] idxs, final double[] values) {
+    sort(idxs, values, 50);
+  }
+  public static void sort(final int[] idxs, final double[] values, int cutoff) {
+    if (idxs.length < cutoff) {
+      //hand-rolled insertion sort
+      for (int i = 0; i < idxs.length; i++) {
+        for (int j = i; j > 0 && values[idxs[j - 1]] > values[idxs[j]]; j--) {
+          int tmp = idxs[j];
+          idxs[j] = idxs[j - 1];
+          idxs[j - 1] = tmp;
+        }
       }
+    } else {
+      Integer[] d = new Integer[idxs.length];
+      for (int i = 0; i < idxs.length; ++i) d[i] = idxs[i];
+//      Arrays.parallelSort(d, new Comparator<Integer>() {
+      Arrays.sort(d, new Comparator<Integer>() {
+        @Override
+        public int compare(Integer x, Integer y) {
+          return values[x] < values[y] ? -1 : (values[x] > values[y] ? 1 : 0);
+        }
+      });
+      for (int i = 0; i < idxs.length; ++i) idxs[i] = d[i];
     }
   }
+
   public static double [] subtract (double [] a, double [] b) {
     double [] c = MemoryManager.malloc8d(a.length);
     subtract(a,b,c);

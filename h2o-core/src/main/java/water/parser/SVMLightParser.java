@@ -3,8 +3,7 @@ package water.parser;
 import java.io.*;
 import java.util.Arrays;
 
-import water.H2O;
-import water.exceptions.H2OParseException;
+import water.Key;
 import water.exceptions.H2OParseSetupException;
 import water.fvec.Vec;
 import water.util.PrettyPrint;
@@ -20,7 +19,7 @@ class SVMLightParser extends Parser {
   private static final int COL = 2;
   private static final int VAL = 3;
 
-  SVMLightParser( ParseSetup ps ) { super(ps); }
+  SVMLightParser( ParseSetup ps, Key jobkey ) { super(ps, jobkey); }
 
   /** Try to parse the bytes as svm light format, return a ParseSetupHandler with type 
    *  SVMLight if the input is in svm light format, throw an exception otherwise.
@@ -33,7 +32,7 @@ class SVMLightParser extends Parser {
     InputStream is = new ByteArrayInputStream(Arrays.copyOf(bytes,i));
     SVMLightParser p = new SVMLightParser(new ParseSetup(ParserType.SVMLight,
             ParseSetup.GUESS_SEP, false,ParseSetup.GUESS_HEADER,ParseSetup.GUESS_COL_CNT,
-            null,null,null,null,null));
+            null,null,null,null,null), null);
     SVMLightInspectParseWriter dout = new SVMLightInspectParseWriter();
     try{ p.streamParse(is, dout); } catch(IOException e) { throw new RuntimeException(e); }
     if (dout._ncols > 0 && dout._nlines > 0 && dout._nlines > dout._invalidLines)
@@ -60,7 +59,7 @@ class SVMLightParser extends Parser {
       long number = 0;
       int zeros = 0;
       int exp = 0;
-      int sgn_exp = 1;
+      int sgnExp = 1;
       boolean decimal = false;
       int fractionDigits = 0;
       int colIdx = 0;
@@ -163,7 +162,7 @@ class SVMLightParser extends Parser {
               break;
             } else if ((c == 'e') || (c == 'E')) {
               lstate = NUMBER_EXP_START;
-              sgn_exp = 1;
+              sgnExp = 1;
               break;
             }
             if (exp == -1) {
@@ -195,7 +194,7 @@ class SVMLightParser extends Parser {
                     lstate = SKIP_LINE;
                   }
                 } else { // we're probably out of sync, skip the rest of the line
-                  dout.invalidLine("unexpected character after column id: " + c);
+                  dout.invalidLine("Unexpected character after column id: " + c);
                   lstate = SKIP_LINE;
                 }
                 break NEXT_CHAR;
@@ -225,7 +224,7 @@ class SVMLightParser extends Parser {
               if (decimal)
                 fractionDigits = offset - zeros - 1 - fractionDigits;
               lstate = NUMBER_EXP_START;
-              sgn_exp = 1;
+              sgnExp = 1;
               zeros = 0;
               break;
             }
@@ -245,7 +244,7 @@ class SVMLightParser extends Parser {
             }
             exp = 0;
             if (c == '-') {
-              sgn_exp *= -1;
+              sgnExp *= -1;
               break;
             } else if (c == '+'){
               break;
@@ -261,7 +260,7 @@ class SVMLightParser extends Parser {
               exp = (exp*10)+(c-'0');
               break;
             }
-            exp *= sgn_exp;
+            exp *= sgnExp;
             lstate = NUMBER_END;
             continue MAIN_LOOP;
           // ---------------------------------------------------------------------
@@ -347,7 +346,7 @@ class SVMLightParser extends Parser {
     public SVMLightInspectParseWriter() {
       for (int i = 0; i < MAX_PREVIEW_LINES;++i)
         _data[i] = new String[MAX_PREVIEW_COLS];
-      for (String[] a_data : _data) Arrays.fill(a_data, "0");
+      for (String[] datum : _data) Arrays.fill(datum, "0");
     }
 
     // Expand columns on-demand

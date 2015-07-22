@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /** A collection of named {@link Vec}s, essentially an R-like Distributed Data Frame.
  *
@@ -72,7 +71,9 @@ public class Frame extends Lockable<Frame> {
   /** Creates an internal frame composed of the given Vecs and names.  The frame has no key. */
   public Frame( String names[], Vec vecs[] ) { this(null,names,vecs); }
   /** Creates an empty frame with given key. */
-  public Frame( Key key ) { this(key,null,new Vec[0]); }
+  public Frame( Key key ) {
+    this(key,null,new Vec[0]);
+  }
 
   /**
    * Special constructor for data with unnamed columns (e.g. svmlight) bypassing *all* checks.
@@ -98,7 +99,7 @@ public class Frame extends Lockable<Frame> {
 
     // Require all Vecs already be installed in the K/V store
     for( Vec vec : vecs ) DKV.prefetch(vec._key);
-    for( Vec vec : vecs ) assert DKV.get(vec._key) != null;
+    for( Vec vec : vecs ) assert DKV.get(vec._key) != null : "null vec: "+vec._key;
 
     // Always require names
     if( names==null ) {         // Make default names, all known to be unique
@@ -149,7 +150,7 @@ public class Frame extends Lockable<Frame> {
       lastName = pint(name);
     if( _lastNameBig && _names.length > 0 ) {
       String last = _names[_names.length-1];
-      if( last.charAt(0)=='C' && lastName == pint(last)+1 )
+      if( !last.equals("") && last.charAt(0)=='C' && lastName == pint(last)+1 )
         return name;
     }
     int cnt=0, again, max=0;
@@ -185,7 +186,7 @@ public class Frame extends Lockable<Frame> {
   }
 
   /** Quick compatibility check between Frames.  Used by some tests for efficient equality checks. */
-  public boolean checkCompatible( Frame fr ) {
+  public boolean isCompatible( Frame fr ) {
     if( numCols() != fr.numCols() ) return false;
     if( numRows() != fr.numRows() ) return false;
     for( int i=0; i<vecs().length; i++ )
@@ -197,6 +198,19 @@ public class Frame extends Lockable<Frame> {
   /** Number of columns
    *  @return Number of columns */
   public int  numCols() { return _keys.length; }
+  /** Number of columns with categoricals expanded
+   * @return Number of columns with categoricals expanded into indicator columns */
+  public int numColsExp() { return numColsExp(true, false); }
+  public int numColsExp(boolean useAllFactorLevels, boolean missingBucket) {
+    if(_vecs == null) return 0;
+    int cols = 0;
+    for(int i = 0; i < _vecs.length; i++) {
+      if(_vecs[i].isEnum() && _vecs[i].domain() != null)
+        cols += _vecs[i].domain().length - (useAllFactorLevels ? 0 : 1) + (missingBucket ? 1 : 0);
+      else cols++;
+    }
+    return cols;
+  }
   /** Number of rows
    *  @return Number of rows */
   public long numRows() { Vec v = anyVec(); return v==null ? 0 : v.length(); }
@@ -256,6 +270,14 @@ public class Frame extends Lockable<Frame> {
       res[i] = all[idxs[i]];
     return res;
   }
+
+  public Vec[] vecs(String[] names) {
+    Vec [] res = new Vec[names.length];
+    for(int i = 0; i < names.length; ++i)
+      res[i] = vec(names[i]);
+    return res;
+  }
+
   // Compute vectors for caching
   private Vec[] vecs_impl() {
     // Load all Vec headers; load them all in parallel by starting prefetches
@@ -301,9 +323,19 @@ public class Frame extends Lockable<Frame> {
   /**   Finds the matching column index, or -1 if missing
    *  @return the matching column index, or -1 if missing */
   public int find( Vec vec ) {
-    Vec[] vecs = vecs();
+    Vec[] vecs = vecs(); //warning: side-effect
+    if (vec == null) return -1;
     for( int i=0; i<vecs.length; i++ )
       if( vec.equals(vecs[i]) )
+        return i;
+    return -1;
+  }
+
+  /**   Finds the matching column index, or -1 if missing
+   *  @return the matching column index, or -1 if missing */
+  public int find( Key key ) {
+    for( int i=0; i<_keys.length; i++ )
+      if( key.equals(_keys[i]) )
         return i;
     return -1;
   }
@@ -317,6 +349,8 @@ public class Frame extends Lockable<Frame> {
       res[i] = find(names[i]);
     return res;
   }
+
+
 
   /** Pair of (column name, Frame key). */
   public static class VecSpecifier extends Iced {
@@ -409,12 +443,39 @@ public class Frame extends Lockable<Frame> {
 
   // Add a bunch of vecs
   public void add( String[] names, Vec[] vecs) {
-    add(names, vecs, vecs.length);
+    bulkAdd(names, vecs);
   }
   public void add( String[] names, Vec[] vecs, int cols ) {
     if (null == vecs || null == names) return;
-    for( int i=0; i<cols; i++ )
-      add(names[i],vecs[i]);
+    if (cols == names.length && cols == vecs.length) {
+      bulkAdd(names, vecs);
+    } else {
+      for (int i = 0; i < cols; i++)
+        add(names[i], vecs[i]);
+    }
+  }
+
+  /** Append multiple named Vecs to the Frame.  Names are forced unique, by appending a
+   *  unique number if needed.
+   */
+  private void bulkAdd(String[] names, Vec[] vecs) {
+    String[] tmpnames = names.clone();
+    int N = names.length;
+    assert(names.length == vecs.length):"names = " + Arrays.toString(names) + ", vecs len = " + vecs.length;
+    for (int i=0; i<N; ++i) {
+      vecs[i] = vecs[i] != null ? makeCompatible(new Frame(vecs[i])).anyVec() : null;
+      checkCompatible(tmpnames[i]=uniquify(tmpnames[i]),vecs[i]);  // Throw IAE is mismatch
+    }
+
+    int ncols = _keys.length;
+    _names = Arrays.copyOf(_names, ncols+N);
+    _keys = Arrays.copyOf(_keys, ncols+N);
+    _vecs = Arrays.copyOf(_vecs, ncols+N);
+    for (int i=0; i<N; ++i) {
+      _names[ncols+i] = tmpnames[i];
+      _keys[ncols+i] = vecs[i]._key;
+      _vecs[ncols+i] = vecs[i];
+    }
   }
 
   /** Append a named Vec to the Frame.  Names are forced unique, by appending a
@@ -527,15 +588,24 @@ public class Frame extends Lockable<Frame> {
   /** Actually remove/delete all Vecs from memory, not just from the Frame.
    *  @return the original Futures, for flow-coding */
   @Override public Futures remove_impl(Futures fs) {
-    for( Vec v : vecs() ) if( v != null ) v.remove(fs);
+    final Key[] keys = _keys;
+    if( keys.length==0 ) return fs;
+    final int ncs = anyVec().nChunks(); // TODO: do not call anyVec which loads all Vecs... only to delete them
     _names = new String[0];
     _vecs = new Vec[0];
     _keys = new Key[0];
+    // Bulk dumb local remove - no JMM, no ordering, no safety.
+    new MRTask() {
+      @Override public void setupLocal() {
+        for( Key k : keys ) if( k != null ) Vec.bulk_remove(k,ncs);
+      }
+    }.doAllNodes();
+
     return fs;
   }
 
   /** Replace one column with another. Caller must perform global update (DKV.put) on
-   * this updated frame.
+   *  this updated frame.
    *  @return The old column, for flow-coding */
   public Vec replace(int col, Vec nv) {
     Vec rv = vecs()[col];
@@ -857,8 +927,6 @@ public class Frame extends Lockable<Frame> {
       return fr2;
     }
     Frame frows = (Frame)orows;
-    Vec vrows = makeCompatible(new Frame(frows.anyVec())).anyVec();
-    DKV.put(vrows);
     // It's a compatible Vec; use it as boolean selector.
     // Build column names for the result.
     Vec [] vecs = new Vec[c2.length+1];
@@ -867,7 +935,7 @@ public class Frame extends Lockable<Frame> {
       vecs[i] = _vecs[c2[i]];
       names[i] = _names[c2[i]];
     }
-    vecs[c2.length] = vrows;
+    vecs[c2.length] = frows.anyVec();
     names[c2.length] = "predicate";
     Frame ff = new Frame(names, vecs);
     return new DeepSelect().doAll(c2.length,ff).outputFrame(names(c2),domains(c2));
@@ -1047,46 +1115,40 @@ public class Frame extends Lockable<Frame> {
    * @return The fresh copy of fr.
    */
   public Frame deepCopy(String keyName) {
-    ParallelVecCopy t;
-    H2O.submitTask(t=new ParallelVecCopy(this)).join();
-    return keyName==null ? new Frame(names(),t._vecs) : new Frame(Key.make(keyName),names(),t._vecs);
+    return new MRTask() {
+      @Override public void map(Chunk[] cs, NewChunk[] ncs) {
+        for(int col=0;col<cs.length;++col)
+          for(int row=0;row<cs[0]._len;++row) {
+            if( cs[col].isNA(row) ) ncs[col].addNA();
+            else if( cs[col] instanceof CStrChunk ) ncs[col].addStr(cs[col], row);
+            else if( cs[col] instanceof C16Chunk ) ncs[col].addUUID(cs[col], row);
+            else if( !cs[col].hasFloat() ) ncs[col].addNum(cs[col].at8(row), 0);
+            else ncs[col].addNum(cs[col].atd(row));
+          }
+      }
+    }.doAll(this.numCols(),this).outputFrame(keyName==null?null:Key.make(keyName),this.names(),this.domains());
   }
 
-  private static class VecCopyTask extends H2O.H2OCountedCompleter<VecCopyTask> {
-    private final Vec _from;
-    private final Vec[] _vecs;
-    private final int _i;
-    VecCopyTask(H2O.H2OCountedCompleter cc, Vec from, Vec[] vecs, int i) { super(cc); _from=from; _vecs=vecs; _i=i; }
-
-    @Override protected void compute2() {
-      _vecs[_i] = _from.makeCopy(_from.domain());
-      tryComplete();
+  // _vecs put into kv store already
+  private class DoCopyFrame extends MRTask<DoCopyFrame> {
+    final Vec[] _vecs;
+    DoCopyFrame(Vec[] vecs) {
+      _vecs = new Vec[vecs.length];
+      for(int i=0;i<vecs.length;++i)
+        _vecs[i] = new Vec(vecs[i].group().addVec(),vecs[i]._espc.clone(), vecs[i].domain(), vecs[i]._type);
     }
-  }
-
-  private static class ParallelVecCopy extends H2O.H2OCountedCompleter<ParallelVecCopy> {
-    private final Frame _fr;
-    private final AtomicInteger _ctr;
-    private final int _maxP=1000;
-
-    //out
-    private Vec[] _vecs;
-    ParallelVecCopy(Frame fr) { _fr=fr; _ctr=new AtomicInteger(_maxP-1); }
-
-    @Override protected void compute2() {
-      addToPendingCount(_fr.numCols()-1);
-      _vecs = new Vec[_fr.numCols()];
-      for( int i=0;i<Math.min(_maxP,_fr.numCols());++i) forkVecTask(i);
-    }
-    private void forkVecTask(final int i) { new VecCopyTask(new Callback(), _fr.vec(i), _vecs, i).fork(); }
-    private class Callback extends H2O.H2OCallback {
-      public Callback(){super(ParallelVecCopy.this);}
-      @Override public void callback(H2O.H2OCountedCompleter h2OCountedCompleter) {
-        int i = _ctr.incrementAndGet();
-        if(i < _vecs.length)
-          forkVecTask(i);
+    @Override public void map(Chunk[] cs) {
+      int i=0;
+      for(Chunk c: cs) {
+        Chunk c2 = (Chunk)c.clone();
+        c2._vec=null;
+        c2._start=-1;
+        c2._cidx=-1;
+        c2._mem = c2._mem.clone();
+        DKV.put(_vecs[i++].chunkKey(c.cidx()), c2, _fs, true);
       }
     }
+    @Override public void postGlobal() { for( Vec _vec : _vecs ) DKV.put(_vec); }
   }
 
   /**
@@ -1099,9 +1161,11 @@ public class Frame extends Lockable<Frame> {
         if( pred.atd(i) != 0 && !pred.isNA(i) ) {
           for( int j = 0; j < chks.length - 1; j++ ) {
             Chunk chk = chks[j];
-            if( chk instanceof C16Chunk ) nchks[j].addUUID(chk, i);
-            else if(chk instanceof CStrChunk) nchks[j].addStr((chk.atStr(new ValueString(), i)));
-            else nchks[j].addNum(chk.atd(i));
+            if( chk.isNA(i) )                   nchks[j].addNA();
+            else if( chk instanceof C16Chunk )  nchks[j].addUUID(chk, i);
+            else if( chk instanceof CStrChunk)  nchks[j].addStr((chk.atStr(new ValueString(), i)));
+            else if( chk.hasFloat() )           nchks[j].addNum(chk.atd(i));
+            else                                nchks[j].addNum(chk.at8(i),0);
           }
         }
       }
@@ -1147,7 +1211,6 @@ public class Frame extends Lockable<Frame> {
     return f2;
   }
 
-
   /** Convert this Frame to a CSV (in an {@link InputStream}), that optionally
    *  is compatible with R 3.1's recent change to read.csv()'s behavior.
    *  @return An InputStream containing this Frame as a CSV */
@@ -1186,7 +1249,7 @@ public class Frame extends Lockable<Frame> {
             if( vs[i].isEnum() ) sb.append('"').append(vs[i].factor(vs[i].at8(_row))).append('"');
             else if( vs[i].isUUID() ) sb.append(PrettyPrint.UUID(vs[i].at16l(_row), vs[i].at16h(_row)));
             else if( vs[i].isInt() ) sb.append(vs[i].at8(_row));
-            else if (vs[i].isString()) sb.append(vs[i].atStr(new ValueString(), _row));
+            else if (vs[i].isString()) sb.append('"').append(vs[i].atStr(new ValueString(), _row)).append('"');
             else {
               double d = vs[i].at(_row);
               // R 3.1 unfortunately changed the behavior of read.csv().

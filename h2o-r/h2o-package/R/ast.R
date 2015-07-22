@@ -48,7 +48,7 @@ function(node) {
 #'
 .is.eval <- function(H2OFrame) {
   key <- H2OFrame@frame_id
-  res <- .h2o.__remoteSend(H2OFrame@conn, paste0(.h2o.__RAPIDS, "/isEval"), ast_key=key)
+  res <- .h2o.__remoteSend(H2OFrame@conn, h2oRestApiVersion = 99, paste0(.h2o.__RAPIDS, "/isEval"), ast_key=key)
   res$evaluated
 }
 
@@ -97,7 +97,10 @@ function(expr, envir, neg = FALSE, sub_one = TRUE) {
   sub <- as.integer(sub_one)
   if (length(expr) == 1L) {
     if (is.symbol(expr)) { expr <- get(deparse(expr), envir); return(.ast.walker(expr, envir, neg, sub_one)) }
-    if (is.numeric(expr[[1L]])) return(paste0('#', eval(expr[[1L]], envir=envir) - sub))
+    if (is.numeric(expr[[1L]])) {
+      if( expr < 0 ) sub <- 0
+      return(paste0('#', eval(expr[[1L]], envir=envir) - sub))
+    }
     if (is.character(expr[[1L]])) return(deparse(expr[[1L]]))
     if (is.character(expr)) return(deparse(expr))
   }
@@ -109,6 +112,7 @@ function(expr, envir, neg = FALSE, sub_one = TRUE) {
         if( is(children[[1]], "ASTNode") ) return(children)
       }
       op <- new("ASTApply", op="llist")
+      if( is(children[[1]], "ASTNode") ) { return(new("ASTNode", root=op, children=children)) }
       if( !(substr(children[[1]],1,1) == "#") ) { op <- new("ASTApply", op="slist") }
       return(new("ASTNode", root=op, children=children))
 

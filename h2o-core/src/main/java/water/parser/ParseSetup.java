@@ -1,9 +1,11 @@
 package water.parser;
 
-import water.*;
+import water.DKV;
+import water.Iced;
+import water.Key;
+import water.MRTask;
 import water.api.ParseSetupV3;
 import water.exceptions.H2OIllegalArgumentException;
-import water.exceptions.H2OInternalParseException;
 import water.exceptions.H2OParseException;
 import water.exceptions.H2OParseSetupException;
 import water.fvec.Frame;
@@ -11,7 +13,6 @@ import water.fvec.Vec;
 import water.fvec.UploadFileVec;
 import water.fvec.FileVec;
 import water.fvec.ByteVec;
-import water.util.Log;
 
 import java.util.Arrays;
 import java.util.HashSet;
@@ -74,7 +75,7 @@ public final class ParseSetup extends Iced {
     this(ps.parse_type, ps.separator, ps.single_quotes, ps.check_header,
             GUESS_COL_CNT, ps.column_names, strToColumnTypes(ps.column_types),
             null, ps.na_strings, null, ps.chunk_size);
-    if(ps.parse_type == null) _parse_type = ParserType.AUTO;
+    if(ps.parse_type == null) _parse_type = ParserType.GUESS;
     if(ps.separator == 0) _separator = GUESS_SEP;
   }
 
@@ -107,6 +108,9 @@ public final class ParseSetup extends Iced {
    */
   public ParseSetup() {}
 
+  public String[] getColumnNames() { return _column_names; }
+  public String[][] getData() { return _data; }
+
   public String[] getColumnTypeStrings() {
     String[] types = new String[_column_types.length];
     for(int i=0; i< types.length; i++)
@@ -133,12 +137,12 @@ public final class ParseSetup extends Iced {
     return types;
   }
 
-  public Parser parser() {
+  public Parser parser(Key jobKey) {
     switch(_parse_type) {
-      case CSV:      return new      CsvParser(this);
-      case XLS:      return new      XlsParser(this);
-      case SVMLight: return new SVMLightParser(this);
-      case ARFF:     return new     ARFFParser(this);
+      case CSV:      return new      CsvParser(this, jobKey);
+      case XLS:      return new      XlsParser(this, jobKey);
+      case SVMLight: return new SVMLightParser(this, jobKey);
+      case ARFF:     return new     ARFFParser(this, jobKey);
     }
     throw new H2OIllegalArgumentException("Unknown file type.  Parse cannot be completed.",
             "Attempted to invoke a parser for ParseType:" + _parse_type +", which doesn't exist.");
@@ -150,7 +154,8 @@ public final class ParseSetup extends Iced {
     if( _column_names ==null ) return conflictingNames;
     HashSet<String> uniqueNames = new HashSet<>();
     for( String n : _column_names)
-      (uniqueNames.contains(n) ? conflictingNames : uniqueNames).add(n);
+      if (n != null)
+        (uniqueNames.contains(n) ? conflictingNames : uniqueNames).add(n);
     return conflictingNames;
   }
 
@@ -165,10 +170,9 @@ public final class ParseSetup extends Iced {
         Double.parseDouble(s);
         return false;       // Number in 1st row guesses: No Column Header
       } catch (NumberFormatException e) { /*Pass - determining if number is possible*/ }
-      if( ParseTime.attemptTimeParse(str.setTo(s)) != Long.MIN_VALUE ) return false;
-      ParseTime.attemptUUIDParse0(str.setTo(s));
-      ParseTime.attemptUUIDParse1(str);
-      if( str.get_off() != -1 ) return false; // Valid UUID parse
+      str.setTo(s);
+      if(ParseTime.isTime(str)) return false;
+      if(ParseUUID.isUUID(str)) return false;
     }
     return true;
   }
@@ -188,7 +192,7 @@ public final class ParseSetup extends Iced {
    * @return ParseSetup settings from looking at all files
    */
   public static ParseSetup guessSetup(Key[] fkeys, boolean singleQuote, int checkHeader) {
-    return guessSetup(fkeys, new ParseSetup(ParserType.AUTO, GUESS_SEP, singleQuote, checkHeader, GUESS_COL_CNT, null));
+    return guessSetup(fkeys, new ParseSetup(ParserType.GUESS, GUESS_SEP, singleQuote, checkHeader, GUESS_COL_CNT, null));
   }
 
   /**
@@ -272,8 +276,8 @@ public final class ParseSetup extends Iced {
         else  // avoid numerical distortion of file size when not compressed
           _totalParseSize += bv.length();
 
-        // Check for supported encodings
-        checkEncoding(bits);
+        // Check for supported character encodings
+        checkCharEncoding(bits);
 
         // only preview 1 DFLT_CHUNK_SIZE for ByteVecs, UploadFileVecs, compressed, and small files
 /*        if (ice instanceof ByteVec
@@ -447,7 +451,7 @@ public final class ParseSetup extends Iced {
       case SVMLight: return SVMLightParser.guessSetup(bits);
       case XLS:      return      XlsParser.guessSetup(bits);
       case ARFF:     return      ARFFParser.guessSetup(bits, sep, singleQuotes, columnNames, naStrings);
-      case AUTO:
+      case GUESS:
         for( ParserType pTypeGuess : guessFileTypeOrder ) {
           try {
             ParseSetup ps = guessSetup(bits,pTypeGuess,sep,ncols,singleQuotes,checkHeader,columnNames,columnTypes, domains, naStrings);
@@ -473,17 +477,15 @@ public final class ParseSetup extends Iced {
     int sep = n.lastIndexOf(java.io.File.separatorChar);
     if( sep > 0 ) n = n.substring(sep+1);
     int dot = n.lastIndexOf('.');
-    if( dot > 0) {
-      while (n.endsWith("zip")
+    while (dot > 0 && (n.endsWith("zip")
               || n.endsWith("gz")
               || n.endsWith("csv")
               || n.endsWith("xls")
               || n.endsWith("txt")
               || n.endsWith("svm")
-              || n.endsWith("arff")) {
-        n = n.substring(0, dot);
-        dot = n.lastIndexOf('.');
-      }
+              || n.endsWith("arff"))) {
+      n = n.substring(0, dot);
+      dot = n.lastIndexOf('.');
     }
     // "2012_somedata" ==> "X2012_somedata"
     if( !Character.isJavaIdentifierStart(n.charAt(0)) ) n = "X"+n;
@@ -515,7 +517,7 @@ public final class ParseSetup extends Iced {
    *
    * @param bits data to be examined for encoding
    */
-  private static final void checkEncoding(byte[] bits) {
+  private static final void checkCharEncoding(byte[] bits) {
     if (bits.length >= 2) {
       if ((bits[0] == (byte) 0xff && bits[1] == (byte) 0xfe) /* UTF-16, little endian */ ||
               (bits[0] == (byte) 0xfe && bits[1] == (byte) 0xff) /* UTF-16, big endian */) {

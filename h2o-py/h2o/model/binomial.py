@@ -4,6 +4,7 @@ Binomial Models
 
 from metrics_base import *
 
+
 class H2OBinomialModel(ModelBase):
   """
   Class for Binomial models.
@@ -87,7 +88,7 @@ class H2OBinomialModel(ModelBase):
     """
     tm = ModelBase._get_metrics(self, *ModelBase._train_or_valid(train, valid))
     if tm is None: return None
-    return tm.metric("error", thresholds=thresholds)
+    return [[acc[0],1-acc[1]] for acc in tm.metric("accuracy", thresholds=thresholds)]
 
   def precision(self, thresholds=None, train=False, valid=False):
     """
@@ -294,70 +295,34 @@ class H2OBinomialModel(ModelBase):
       metrics.append([t,row[midx]])
     return metrics
 
-  def confusion_matrix(self, metric="f1", train=False, valid=False):
+  def plot(self, type="roc", train=False, valid=False, **kwargs):
     """
-    Get the confusion matrix for the specified metric
-    If both train and valid are False, return the train.
-    If both train and valid are True, return the valid.
-
-    :param metric: A string in {"min_per_class_accuracy", "absolute_MCC", "tnr", "fnr", "fpr", "tpr", "precision", "error", "accuracy", "f0point5", "f2", "f1"}
+    Produce the desired metric plot
+    :param type: the type of metric plot (currently, only ROC supported)
     :param train: Return the max per class error for training data.
     :param valid: Return the max per class error for the validation data.
-    :return: the confusion matrix for the metric
-    """
-    print "Confusion matrix for metric: ", metric
-    print
-    tm = ModelBase._get_metrics(self, *ModelBase._train_or_valid(train, valid))
-    if tm is None: return None
-    thresh = tm.find_threshold_by_max_metric(metric)
-    thresh2d = tm._metric_json['thresholds_and_metric_scores']
-    tidx = thresh2d.col_header.index('tps')
-    fidx = thresh2d.col_header.index('fps')
-    p = tm._metric_json['max_criteria_and_metric_scores'].cell_values[tidx-1][2]
-    n = tm._metric_json['max_criteria_and_metric_scores'].cell_values[fidx-1][2]
-    idx = tm.find_idx_by_threshold(thresh)
-    row = thresh2d.cell_values[idx]
-    tps = row[tidx]
-    fps = row[fidx]
-    c0  = float("nan") if isinstance(n, str) or isinstance(fps, str) else n - fps
-    c1  = float("nan") if isinstance(p, str) or isinstance(tps, str) else p - tps
-    fps = float("nan") if isinstance(fps,str) else fps
-    tps = float("nan") if isinstance(tps,str) else tps
-    return [[c0,fps],[c1,tps]]
-
-  def confusion_matrices(self, thresholds=None, train=False, valid=False):
-    """
-    Each threshold defines a confusion matrix. For each threshold in the thresholds list, return a 2x2 list.
-    If both train and valid are False, return the train.
-    If both train and valid are True, return the valid.
-
-    :param train: Return the max per class error for training data.
-    :param valid: Return the max per class error for the validation data.
-    :param thresholds: thresholds parameter must be a list (i.e. [0.01, 0.5, 0.99]). If None, then the thresholds in this set of metrics will be used.
-    :return: A list of 2x2-lists: [, ..., [ [tns,fps], [fns,tps] ], ..., ]
+    :param show: if False, the plot is not shown. matplotlib show method is blocking.
+    :return: None
     """
     tm = ModelBase._get_metrics(self, *ModelBase._train_or_valid(train, valid))
     if tm is None: return None
-    if not thresholds: thresholds=[tm.find_threshold_by_max_metric("f1")]
-    if not isinstance(thresholds,list):
-      raise ValueError("thresholds parameter must be a list (i.e. [0.01, 0.5, 0.99])")
-    thresh2d = tm._metric_json['thresholds_and_metric_scores']
-    tidx = thresh2d.col_header.index('tps')
-    fidx = thresh2d.col_header.index('fps')
-    p = tm._metric_json['max_criteria_and_metric_scores'].cell_values[tidx-1][2]
-    n = tm._metric_json['max_criteria_and_metric_scores'].cell_values[fidx-1][2]
-    cms = []
-    for t in thresholds:
-      idx = tm.find_idx_by_threshold(t)
-      row = thresh2d.cell_values[idx]
-      tps = row[tidx]
-      fps = row[fidx]
-      c0  = float("nan") if isinstance(n,  str) or isinstance(fps, str) else n - fps
-      c1  = float("nan") if isinstance(p,  str) or isinstance(tps, str) else p - tps
-      fps = float("nan") if isinstance(fps,str) else fps
-      tps = float("nan") if isinstance(tps,str) else tps
-      cms.append([[c0,fps],[c1,tps]])
-    return cms
+    tm.plot(type=type, **kwargs)
+
+  def confusion_matrix(self, metrics=None, thresholds=None, train=False, valid=False):
+    """
+    Get the confusion matrix for the specified metrics/thresholds
+    If both train and valid are False, return the train.
+    If both train and valid are True, return the valid.
+
+    :param metrics: A string (or list of strings) in {"min_per_class_accuracy", "absolute_MCC", "tnr", "fnr", "fpr", "tpr", "precision", "accuracy", "f0point5", "f2", "f1"}
+    :param thresholds: A value (or list of values) between 0 and 1
+    :param train: Return the max per class error for training data.
+    :param valid: Return the max per class error for the validation data.
+    :return: a list of ConfusionMatrix objects (if there are more than one to return), or a single ConfusionMatrix (if there is only one)
+    """
+    tm = ModelBase._get_metrics(self, *ModelBase._train_or_valid(train, valid))
+    if tm is None: return None
+    return tm.confusion_matrix(metrics=metrics, thresholds=thresholds)
 
   def find_threshold_by_max_metric(self,metric,train=False,valid=False):
     """
@@ -373,7 +338,7 @@ class H2OBinomialModel(ModelBase):
     if tm is None: return None
     crit2d = tm._metric_json['max_criteria_and_metric_scores']
     for e in crit2d.cell_values:
-      if e[0]==metric:
+      if e[0]=="max "+metric:
         return e[1]
     raise ValueError("No metric "+str(metric))
 
@@ -397,4 +362,12 @@ class H2OBinomialModel(ModelBase):
       t = float(e[0])
       if abs(t-threshold) < 0.00000001 * max(t,threshold):
         return i
-    raise ValueError("No threshold "+str(threshold))
+    if threshold >= 0 and threshold <= 1:
+      thresholds = [float(e[0]) for i,e in enumerate(thresh2d.cell_values)]
+      threshold_diffs = [abs(t - threshold) for t in thresholds]
+      closest_idx = threshold_diffs.index(min(threshold_diffs))
+      closest_threshold = thresholds[closest_idx]
+      print "Could not find exact threshold {0}; using closest threshold found {1}." \
+        .format(threshold, closest_threshold)
+      return closest_idx
+    raise ValueError("Threshold must be between 0 and 1, but got {0} ".format(threshold))

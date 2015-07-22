@@ -4,6 +4,10 @@ import java.util.Arrays;
 
 public class MathUtils {
 
+  public static double weightedSigma(long nobs, double wsum, double xSum, double xxSum) {
+    double reg = 1.0/wsum;
+    return nobs <= 1? 0 : Math.sqrt(xxSum*reg - (xSum*xSum) * reg * reg);
+  }
 
   /** Fast approximate sqrt
    *  @return sqrt(x) with up to 5% relative error */
@@ -183,6 +187,7 @@ public class MathUtils {
   };
 
   public static double roundToNDigits(double d, int n) {
+    if(d == 0)return d;
     int log = (int)Math.log10(d);
     int exp = n;
     exp -= log;
@@ -208,6 +213,11 @@ public class MathUtils {
     stddev /= counts.length;
     stddev = Math.sqrt(stddev);
     return new double[] {min,max,mean,stddev};
+  }
+
+  public static double sign(double d) {
+    if(d == 0)return 0;
+    return d < 0?-1:1;
   }
 
 }

@@ -47,12 +47,24 @@ public final class PersistHdfs extends Persist {
       Log.debug("resource ", p.getAbsolutePath(), " added to the hadoop configuration");
     } else {
       conf = new Configuration();
-      if( H2O.ARGS.hdfs != null && H2O.ARGS.hdfs.length() > 0 ) {
-        // setup default remote Filesystem - for version 0.21 and higher
-        conf.set("fs.defaultFS", H2O.ARGS.hdfs);
-        // To provide compatibility with version 0.20.0 it is necessary to setup the property
-        // fs.default.name which was in newer version renamed to 'fs.defaultFS'
-        conf.set("fs.default.name", H2O.ARGS.hdfs);
+      Path confDir = null;
+      // Try to guess location of default Hadoop configuration
+      // http://www.slideshare.net/martyhall/hadoop-tutorial-hdfs-part-3-java-api
+      // WARNING: loading of default properties should be disabled if the job
+      // is executed via yarn command which prepends core-site.xml properties on classpath
+      if (System.getenv().containsKey("HADOOP_CONF_DIR")) {
+        confDir = new Path(System.getenv("HADOOP_CONF_DIR"));
+      } else if (System.getenv().containsKey("YARN_CONF_DIR")) {
+        confDir = new Path(System.getenv("YARN_CONF_DIR"));
+      } else if (System.getenv().containsKey("HADOOP_HOME")) {
+        confDir = new Path(System.getenv("HADOOP_HOME"), "conf");
+      }
+      // Load default HDFS configuration
+      if (confDir != null) {
+        Log.info("Using HDFS configuration from " + confDir);
+        conf.addResource(new Path(confDir, "core-site.xml"));
+      } else {
+        Log.debug("Cannot find HADOOP_CONF_DIR or YARN_CONF_DIR - default HDFS properties are NOT loaded!");
       }
     }
     CONF = conf;
@@ -282,7 +294,8 @@ public final class PersistHdfs extends Persist {
 
   @Override
   public Key uriToKey(URI uri) throws IOException {
-    assert "hdfs".equals(uri.getScheme()) || "s3n".equals(uri.getScheme()) : "Expected hdfs or s3n scheme, but uri is " + uri;
+    assert "hdfs".equals(uri.getScheme()) || "s3".equals(uri.getScheme())
+            || "s3n".equals(uri.getScheme()) || "s3a".equals(uri.getScheme()) : "Expected hdfs, s3 s3n, or s3a scheme, but uri is " + uri;
 
     FileSystem fs = FileSystem.get(uri, PersistHdfs.CONF);
     FileStatus[] fstatus = fs.listStatus(new Path(uri));
@@ -291,16 +304,31 @@ public final class PersistHdfs extends Persist {
     return HDFSFileVec.make(fstatus[0].getPath().toString(), fstatus[0].getLen());
   }
 
-  private static final Pattern S3N_BARE_BUCKET = Pattern.compile("s3n://[^/]*");
+  // Is there a bucket name without a trailing "/" ?
+  private boolean isBareS3NBucketWithoutTrailingSlash(String s) {
+    String s2 = s.toLowerCase();
+    Matcher m = Pattern.compile("s3n://[^/]*").matcher(s2);
+    return m.matches();
+  }
+  // We don't handle HDFS style S3 storage, just native storage.  But all users
+  // don't know about HDFS style S3 so treat S3 as a request for a native file
+  private static final String convertS3toS3N(String s) {
+    if (Pattern.compile("^s3[a]?://.*").matcher(s).matches())
+      return s.replaceFirst("^s3[a]?://", "s3n://");
+    else return s;
+  }
 
   @Override
   public ArrayList<String> calcTypeaheadMatches(String filter, int limit) {
     // Get HDFS configuration
     Configuration conf = PersistHdfs.CONF;
-    // Handle S3N bare buckets - s3n://bucketname should be always suffixed by '/'
-    // since underlying Jets3n will throw NPE, i.e. right filter name should be
-    // s3n://bucketname/
-    if (S3N_BARE_BUCKET.matcher(filter).matches()) {
+
+    // Hack around s3://
+    filter = convertS3toS3N(filter);
+
+    // Handle S3N bare buckets - s3n://bucketname should be suffixed by '/'
+    // or underlying Jets3n will throw NPE. filter name should be s3n://bucketname/
+    if (isBareS3NBucketWithoutTrailingSlash(filter)) {
       filter += "/";
     }
     // Output matches
@@ -333,17 +361,11 @@ public final class PersistHdfs extends Persist {
     return array;
   }
 
-  private boolean isBareS3NBucketWithoutTrailingSlash(String s) {
-    String s2 = s.toLowerCase();
-    Pattern p = Pattern.compile("s3n://[^/]*");
-    Matcher m = p.matcher(s2);
-    boolean b = m.matches();
-    return b;
-  }
-
   @Override
   public void importFiles(String path, ArrayList<String> files, ArrayList<String> keys, ArrayList<String> fails, ArrayList<String> dels) {
-    // Fix for S3N kind of URL
+    path = convertS3toS3N(path);
+
+    // Fix for S3 kind of URL
     if (isBareS3NBucketWithoutTrailingSlash(path)) {
       path += "/";
     }
@@ -384,10 +406,7 @@ public final class PersistHdfs extends Persist {
       FileStatus[] arr1 = fs.listStatus(p);
       PersistEntry[] arr2 = new PersistEntry[arr1.length];
       for (int i = 0; i < arr1.length; i++) {
-        arr2[i] = new PersistEntry();
-        arr2[i]._name = arr1[i].getPath().getName();
-        arr2[i]._size = arr1[i].getLen();
-        arr2[i]._timestamp_millis = arr1[i].getModificationTime();
+        arr2[i] = new PersistEntry(arr1[i].getPath().getName(), arr1[i].getLen(), arr1[i].getModificationTime());
       }
       return arr2;
     }

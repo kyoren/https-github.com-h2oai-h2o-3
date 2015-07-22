@@ -63,11 +63,14 @@ public class h2odriver extends Configured implements Tool {
   static boolean enableDebug = false;
   static boolean enableSuspend = false;
   static int debugPort = 5005;    // 5005 is the default from IDEA
-  static String licenseFileName = null;
   static String flowDir = null;
-
-  // State filled in as a result of handling options.
-  static String licenseData = null;
+  static ArrayList<String> extraArguments = new ArrayList<String>();
+  static String jksFileName = null;
+  static String jksPass = null;
+  static boolean hashLogin = false;
+  static boolean ldapLogin = false;
+  static String loginConfFileName = null;
+  static String userName = System.getProperty("user.name");
 
   // Runtime state that might be touched by different threads.
   volatile ServerSocket driverCallbackSocket = null;
@@ -94,11 +97,7 @@ public class h2odriver extends Configured implements Tool {
     }
     catch (Exception ignore) {}
 
-    if (clazz != null) {
-      return true;
-    }
-
-    return false;
+    return (clazz != null);
   }
 
   public static class H2ORecordReader extends RecordReader<Text, Text> {
@@ -141,8 +140,7 @@ public class h2odriver extends Configured implements Tool {
     public RecordReader<Text, Text> createRecordReader(
             InputSplit ignored, TaskAttemptContext taskContext)
             throws IOException {
-      H2ORecordReader trr = new H2ORecordReader();
-      return trr;
+      return(new H2ORecordReader());
     }
   }
 
@@ -308,9 +306,9 @@ public class h2odriver extends Configured implements Tool {
     private ServerSocket _ss;
 
     // Nodes and socks
-    private HashSet<String> _dupChecker;
-    private ArrayList<String> _nodes;
-    private ArrayList<Socket> _socks;
+    private final HashSet<String> _dupChecker = new HashSet<String>();
+    private final ArrayList<String> _nodes = new ArrayList<String>();
+    private final ArrayList<Socket> _socks = new ArrayList<Socket>();
 
     public void setServerSocket (ServerSocket value) {
       _ss = value;
@@ -326,6 +324,7 @@ public class h2odriver extends Configured implements Tool {
           System.exit(1);
         }
 
+        _dupChecker.add(entry);
         _nodes.add(entry);
         _socks.add(s);
         if (_nodes.size() != numNodes) {
@@ -339,8 +338,7 @@ public class h2odriver extends Configured implements Tool {
 
         // Build the flatfile and send it to all nodes.
         String flatfile = "";
-        for (int i = 0; i < _nodes.size(); i++) {
-          String val = _nodes.get(i);
+        for (String val : _nodes) {
           flatfile += val;
           flatfile += "\n";
         }
@@ -369,10 +367,6 @@ public class h2odriver extends Configured implements Tool {
 
     @Override
     public void run() {
-      _dupChecker = new HashSet<String>();
-      _nodes = new ArrayList<String>();
-      _socks = new ArrayList<Socket>();
-
       while (true) {
         try {
           Socket s = _ss.accept();
@@ -463,8 +457,8 @@ public class h2odriver extends Configured implements Tool {
                     "          o  All mappers must start before the H2O cloud is considered up.\n" +
                     "\n" +
                     "Examples:\n" +
-                    "          hadoop jar h2odriver.jar -nodes 1 -mapperXmx 1g -output hdfsOutputDir\n" +
-                    "          hadoop jar h2odriver.jar -nodes 1 -mapperXmx 1g -notify notify.txt -disown -output hdfsOutputDir\n" +
+                    "          hadoop jar h2odriver.jar -nodes 1 -mapperXmx 6g -output hdfsOutputDir\n" +
+                    "          hadoop jar h2odriver.jar -nodes 1 -mapperXmx 6g -notify notify.txt -disown -output hdfsOutputDir\n" +
                     "\n" +
                     "Exit value:\n" +
                     "          0 means the cluster exited successfully with an orderly Shutdown.\n" +
@@ -631,13 +625,35 @@ public class h2odriver extends Configured implements Tool {
         enablePrintGCDetails = true;
         enablePrintGCTimeStamps = true;
       }
-      else if (s.equals("-license")) {
-        i++; if (i >= args.length) { usage(); }
-        licenseFileName = args[i];
-      }
       else if (s.equals("-flow_dir")) {
         i++; if (i >= args.length) { usage(); }
         flowDir = args[i];
+      }
+      else if (s.equals("-J")) {
+        i++; if (i >= args.length) { usage(); }
+        extraArguments.add(args[i]);
+      }
+      else if (s.equals("-jks")) {
+        i++; if (i >= args.length) { usage(); }
+        jksFileName = args[i];
+      }
+      else if (s.equals("-jks_pass")) {
+        i++; if (i >= args.length) { usage(); }
+        jksPass = args[i];
+      }
+      else if (s.equals("-hash_login")) {
+        hashLogin = true;
+      }
+      else if (s.equals("-ldap_login")) {
+        ldapLogin = true;
+      }
+      else if (s.equals("-login_conf")) {
+        i++; if (i >= args.length) { usage(); }
+        loginConfFileName = args[i];
+      }
+      else if (s.equals("-user_name")) {
+        i++; if (i >= args.length) { usage(); }
+        userName = args[i];
       }
       else {
         error("Unrecognized option " + s);
@@ -645,7 +661,9 @@ public class h2odriver extends Configured implements Tool {
 
       i++;
     }
+  }
 
+  void validateArgs() {
     // Check for mandatory arguments.
     if (numNodes < 1) {
       error("Number of H2O nodes must be greater than 0 (must specify -n)");
@@ -685,8 +703,7 @@ public class h2odriver extends Configured implements Tool {
         networks[0] = network;
       }
 
-      for (int j = 0; j < networks.length; j++) {
-        String n = networks[j];
+      for (String n : networks) {
         Pattern p = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)\\.(\\d+)/(\\d+)");
         Matcher m = p.matcher(n);
         boolean b = m.matches();
@@ -715,24 +732,6 @@ public class h2odriver extends Configured implements Tool {
     if ((nthreads >= 0) && (nthreads < 4)) {
       error("nthreads invalid (must be >= 4): " + nthreads);
     }
-
-    if (licenseFileName != null) {
-      try {
-        licenseData = readFile(licenseFileName);
-      }
-      catch (Exception xe) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Failed to read license file: ");
-        if (xe.getLocalizedMessage() != null) {
-          sb.append(xe.getLocalizedMessage());
-        }
-        else {
-          sb.append(licenseFileName);
-        }
-
-        error(sb.toString());
-      }
-    }
   }
 
   static String calcMyIp() throws Exception {
@@ -750,9 +749,7 @@ public class h2odriver extends Configured implements Tool {
     }
 
     InetAddress ia = InetAddress.getLocalHost();
-    String s = ia.getHostAddress();
-
-    return s;
+    return ia.getHostAddress();
   }
 
   private final int CLUSTER_ERROR_JOB_COMPLETED_TOO_EARLY = 5;
@@ -862,10 +859,46 @@ public class h2odriver extends Configured implements Tool {
     }
   }
 
+  private int mapperArgsLength = 0;
+  private int mapperConfLength = 0;
+
+  private void addMapperArg(Configuration conf, String name) {
+    conf.set(h2omapper.H2O_MAPPER_ARGS_BASE + Integer.toString(mapperArgsLength), name);
+    mapperArgsLength++;
+  }
+
+  private void addMapperArg(Configuration conf, String name, String value) {
+    addMapperArg(conf, name);
+    addMapperArg(conf, value);
+  }
+
+  private void addMapperConf(Configuration conf, String name, String value, String payloadFileName) {
+    String payload = "";
+    try {
+      payload = readFile(payloadFileName);
+    }
+    catch (Exception e) {
+      StringBuilder sb = new StringBuilder();
+      sb.append("Failed to read config file (").append(payloadFileName).append(")");
+      if (e.getLocalizedMessage() != null) {
+        sb.append(": ");
+        sb.append(e.getLocalizedMessage());
+      }
+
+      error(sb.toString());
+    }
+
+    conf.set(h2omapper.H2O_MAPPER_CONF_ARG_BASE + Integer.toString(mapperConfLength), name);
+    conf.set(h2omapper.H2O_MAPPER_CONF_BASENAME_BASE + Integer.toString(mapperConfLength), value);
+    conf.set(h2omapper.H2O_MAPPER_CONF_PAYLOAD_BASE + Integer.toString(mapperConfLength), payload);
+    mapperConfLength++;
+  }
+
   private int run2(String[] args) throws Exception {
     // Parse arguments.
     // ----------------
     parseArgs (args);
+    validateArgs();
 
     // Set up callback address and port.
     // ---------------------------------
@@ -961,33 +994,60 @@ public class h2odriver extends Configured implements Tool {
       conf.set("mapred.job.reuse.jvm.num.tasks", "1");
     }
 
-    conf.set(h2omapper.H2O_JOBTRACKERNAME_KEY, jobtrackerName);
     conf.set(h2omapper.H2O_DRIVER_IP_KEY, driverCallbackIp);
     conf.set(h2omapper.H2O_DRIVER_PORT_KEY, Integer.toString(actualDriverCallbackPort));
-    conf.set(h2omapper.H2O_NETWORK_KEY, network);
+
+    // Arguments.
+    addMapperArg(conf, "-name", jobtrackerName);
+    if (network.length() > 0) {
+      addMapperArg(conf, "-network", network);
+    }
     if (nthreads >= 0) {
-        conf.set(h2omapper.H2O_NTHREADS_KEY, Integer.toString(nthreads));
+      addMapperArg(conf, "-nthreads", Integer.toString(nthreads));
     }
     if (basePort >= 0) {
-        conf.set(h2omapper.H2O_BASE_PORT_KEY, Integer.toString(basePort));
+      addMapperArg(conf, "-baseport", Integer.toString(basePort));
     }
     if (beta) {
-        conf.set(h2omapper.H2O_BETA_KEY, "-beta");
+      addMapperArg(conf, "-beta");
     }
     if (enableRandomUdpDrop) {
-      conf.set(h2omapper.H2O_RANDOM_UDP_DROP_KEY, "-random_udp_drop");
-    }
-    if (licenseData != null) {
-        conf.set(h2omapper.H2O_LICENSE_DATA_KEY, licenseData);
+      addMapperArg(conf, "-random_udp_drop");
     }
     if (flowDir != null) {
-        conf.set(h2omapper.H2O_FLOW_DIR_KEY, flowDir);
+      addMapperArg(conf, "-flow_dir", flowDir);
+    }
+    if((new File(".h2o_no_collect")).exists() || (new File(System.getProperty("user.home")+"/.h2o_no_collect")).exists()) {
+      addMapperArg(conf, "-ga_opt_out");
     }
     String hadoopVersion = calcHadoopVersion();
-    conf.set(h2omapper.H2O_HADOOP_VERSION, hadoopVersion);
-    if((new File(".h2o_no_collect")).exists() || (new File(System.getProperty("user.home")+"/.h2o_no_collect")).exists()) {
-      conf.set(h2omapper.H2O_GA_OPTOUT, "-ga_opt_out");
+    addMapperArg(conf, "-ga_hadoop_ver", hadoopVersion);
+    if (jksPass != null) {
+      addMapperArg(conf, "-jks_pass", jksPass);
     }
+    if (hashLogin) {
+      addMapperArg(conf, "-hash_login");
+    }
+    if (ldapLogin) {
+      addMapperArg(conf, "-ldap_login");
+    }
+    addMapperArg(conf, "-user_name", userName);
+
+    for (String s : extraArguments) {
+      addMapperArg(conf, s);
+    }
+
+    conf.set(h2omapper.H2O_MAPPER_ARGS_LENGTH, Integer.toString(mapperArgsLength));
+
+    // Config files.
+    if (jksFileName != null) {
+      addMapperConf(conf, "-jks", "h2o.jks", jksFileName);
+    }
+    if (loginConfFileName != null) {
+      addMapperConf(conf, "-login_conf", "login.conf", loginConfFileName);
+    }
+
+    conf.set(h2omapper.H2O_MAPPER_CONF_LENGTH, Integer.toString(mapperConfLength));
 
     // Set up job stuff.
     // -----------------
@@ -1030,6 +1090,7 @@ public class h2odriver extends Configured implements Tool {
 
         Class clazz = Class.forName("water.hadoop.H2OYarnDiagnostic");
         if (clazz != null) {
+          @SuppressWarnings("all")
           Method method = clazz.getMethod("diagnose", String.class, String.class, int.class, int.class, int.class);
           String queueName;
           queueName = conf.get("mapreduce.job.queuename");

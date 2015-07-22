@@ -29,10 +29,16 @@
   stopifnot(is(conn, "H2OConnection"))
   stopifnot(is.character(urlSuffix))
 
+  if (conn@https) {
+    scheme = "https"
+  } else {
+    scheme = "http"
+  }
+
   if (missing(h2oRestApiVersion))
-    sprintf("http://%s:%s/%s", conn@ip, as.character(conn@port), urlSuffix)
+    sprintf("%s://%s:%s/%s", scheme, conn@ip, as.character(conn@port), urlSuffix)
   else
-    sprintf("http://%s:%s/%s/%s", conn@ip, as.character(conn@port), h2oRestApiVersion, urlSuffix)
+    sprintf("%s://%s:%s/%s/%s", scheme, conn@ip, as.character(conn@port), h2oRestApiVersion, urlSuffix)
 }
 
 .h2o.doRawREST <- function(conn = h2o.getConnection(), h2oRestApiVersion, urlSuffix, parms, method, fileUploadInfo, ...) {
@@ -58,6 +64,22 @@
   }
 
   url = .h2o.calcBaseURL(conn = conn, h2oRestApiVersion = h2oRestApiVersion, urlSuffix = urlSuffix)
+
+  opts = curlOptions()
+  if (!is.na(conn@username)) {
+    if (is.na(conn@password)) {
+      stop("Password not specified")
+    }
+
+    userpwd = sprintf("%s:%s", conn@username, conn@password)
+    basicAuth = 1L
+    opts = curlOptions(userpwd = userpwd, httpauth = basicAuth, .opts = opts)
+  }
+  if (conn@https) {
+    if (conn@insecure) {
+      opts = curlOptions(ssl.verifypeer = 0L, .opts = opts)
+    }
+  }
 
   queryString = ""
   i = 1L
@@ -110,7 +132,8 @@
     tmp = tryCatch(getURL(url = url,
                           headerfunction = h$update,
                           useragent = R.version.string,
-                          timeout = timeout_secs),
+                          timeout = timeout_secs,
+                          .opts = opts),
                    error = function(x) { .__curlError <<- TRUE; .__curlErrorMessage <<- x$message })
     if (! .__curlError) {
       httpStatusCode = as.numeric(h$value()["status"])
@@ -128,7 +151,8 @@
                                               useragent = R.version.string,
                                               httpheader = c('Expect' = ''),
                                               verbose = FALSE,
-                                              timeout = timeout_secs)),
+                                              timeout = timeout_secs,
+                                              .opts = opts)),
                    error = function(x) { .__curlError <<- TRUE; .__curlErrorMessage <<- x$message })
     if (! .__curlError) {
       httpStatusCode = as.numeric(h$value()["status"])
@@ -145,7 +169,8 @@
                                useragent = R.version.string,
                                httpheader = c('Expect' = ''),
                                verbose = FALSE,
-                               timeout = timeout_secs),
+                               timeout = timeout_secs,
+                               .opts = opts),
                    error = function(x) { .__curlError <<- TRUE; .__curlErrorMessage <<- x$message })
     if (! .__curlError) {
       httpStatusCode = as.numeric(h$value()["status"])
@@ -161,7 +186,8 @@
                                 headerfunction = h$update,
                                 useragent=R.version.string,
                                 verbose = FALSE,
-                                timeout = timeout_secs),
+                                timeout = timeout_secs,
+                                .opts = opts),
                     error = function(x) { .__curlError <<- TRUE; .__curlErrorMessage <<- x$message })
     if (! .__curlError) {
       httpStatusCode = as.numeric(h$value()["status"])
@@ -434,8 +460,18 @@
     }
     x
   }
+  # hack that counters the fact that RCurl will escape already escaped string
+  txt <- gsub("\\\"","\"",txt); 
+  txt <- gsub("\\\\,","\\,",txt);
+
   res <- processMatrices(fromJSON(txt, ...))
   processTables(res)
+}
+
+
+.format.helper <- function(x, format) {
+    if( is.list(x) ) lapply(x, .format.helper, format)
+    else             sapply(x, function(i) if( is.na(i) ) "" else sprintf(format, i))
 }
 
 #' Print method for H2OTable objects
@@ -451,9 +487,11 @@ print.H2OTable <- function(x, header=TRUE, ...) {
   # format columns
   formats <- attr(x, "formats")
   xx <- x
-  for (j in seq_along(x))
-    xx[[j]] <- ifelse(is.na(x[[j]]), "", sprintf(formats[j], x[[j]]))
 
+  for (j in seq_along(x)) {
+    if( formats[j] == "%d" ) formats[j] <- "%f"
+    xx[[j]] <- .format.helper(x[[j]], formats[j])
+  }
   # drop empty columns
   nz <- unlist(lapply(xx, function(y) any(nzchar(y))), use.names = FALSE)
   xx <- xx[nz]
@@ -484,7 +522,7 @@ print.H2OTable <- function(x, header=TRUE, ...) {
 # Error checking is performed.
 #
 # @return JSON object converted from the response payload
-.h2o.__remoteSend <- function(conn = h2o.getConnection(), page, method = "GET", ..., .params = list(), raw=FALSE) {
+.h2o.__remoteSend <- function(conn = h2o.getConnection(), page, method = "GET", ..., .params = list(), raw=FALSE, h2oRestApiVersion = .h2o.__REST_API_VERSION) {
   stopifnot(is(conn, "H2OConnection"))
   stopifnot(is.character(method))
   stopifnot(is.list(.params))
@@ -504,8 +542,8 @@ print.H2OTable <- function(x, header=TRUE, ...) {
 
   rawREST <- ""
 
-  if( !is.null(timeout) ) rawREST <- .h2o.doSafeREST(conn = conn, urlSuffix = page, parms = .params, method = method, timeout = timeout)
-  else                    rawREST <- .h2o.doSafeREST(conn = conn, urlSuffix = page, parms = .params, method = method)
+  if( !is.null(timeout) ) rawREST <- .h2o.doSafeREST(conn = conn, h2oRestApiVersion = h2oRestApiVersion, urlSuffix = page, parms = .params, method = method, timeout = timeout)
+  else                    rawREST <- .h2o.doSafeREST(conn = conn, h2oRestApiVersion = h2oRestApiVersion, urlSuffix = page, parms = .params, method = method)
 
   if( raw ) rawREST
   else      .h2o.fromJSON(rawREST)
@@ -520,12 +558,29 @@ print.H2OTable <- function(x, header=TRUE, ...) {
 #'
 #' @param conn H2O connection object
 #' @return TRUE if the cluster is up; FALSE otherwise
+#' @export
 h2o.clusterIsUp <- function(conn = h2o.getConnection()) {
   if (!is(conn, "H2OConnection")) stop("`conn` must be an H2OConnection object")
 
-  rv = .h2o.doRawGET(conn = conn, urlSuffix = "")
+  rv <- .h2o.doRawGET(conn = conn, urlSuffix = "")
 
-  !rv$curlError && ((rv$httpStatusCode == 200) || (rv$httpStatusCode == 301))
+  if (rv$curlError) {
+    return(FALSE)
+  }
+
+  if (rv$httpStatusCode == 401) {
+    warning("401 Unauthorized Access.  Did you forget to provide a username and password?")
+  }
+
+  if (rv$httpStatusCode == 200) {
+    return(TRUE)
+  }
+
+  if (rv$httpStatusCode == 301) {
+    return(TRUE)
+  }
+
+  return(FALSE)
 }
 
 #'
@@ -542,6 +597,7 @@ h2o.killMinus3 <- function(conn = h2o.getConnection()) {
 #' Print H2O cluster info
 #'
 #' @param conn H2O connection object
+#' @export
 h2o.clusterInfo <- function(conn = h2o.getConnection()) {
   stopifnot(is(conn, "H2OConnection"))
   if(! h2o.clusterIsUp(conn)) {
@@ -651,6 +707,7 @@ h2o.clusterInfo <- function(conn = h2o.getConnection()) {
       job = jobs[[1]]
 
       status = job$status
+      print(paste0("Job status: ", status))
       stopifnot(is.character(status))
 
       # check failed up front...

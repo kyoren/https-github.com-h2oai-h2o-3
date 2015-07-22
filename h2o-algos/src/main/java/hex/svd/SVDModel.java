@@ -1,17 +1,13 @@
 package hex.svd;
 
-import hex.DataInfo;
-import hex.Model;
-import hex.ModelMetrics;
-import hex.ModelMetricsUnsupervised;
+import hex.*;
 import water.DKV;
-import water.H2O;
 import water.Key;
 import water.MRTask;
 import water.fvec.Chunk;
 import water.fvec.Frame;
-import water.fvec.Vec;
-import water.util.TwoDimTable;
+import water.util.JCodeGen;
+import water.util.SB;
 
 public class SVDModel extends Model<SVDModel,SVDModel.SVDParameters,SVDModel.SVDOutput> {
   public static class SVDParameters extends Model.Parameters {
@@ -20,8 +16,10 @@ public class SVDModel extends Model<SVDModel,SVDModel.SVDParameters,SVDModel.SVD
     public int _max_iterations = 1000;    // Maximum number of iterations
     public long _seed = System.nanoTime();        // RNG seed
     public boolean _keep_u = true;    // Should left singular vectors be saved in memory? (Only applies if _only_v = false)
-    public Key<Frame> _u_key;         // Frame key for left singular vectors (U)
+    // public Key<Frame> _u_key;         // Frame key for left singular vectors (U)
+    public String _u_name;
     public boolean _only_v = false;   // Compute only right singular vectors? (Faster if true)
+    public boolean _use_all_factor_levels = true;   // When expanding categoricals, should first level be dropped?
   }
 
   public static class SVDOutput extends Model.Output {
@@ -34,15 +32,34 @@ public class SVDModel extends Model<SVDModel,SVDModel.SVDParameters,SVDModel.SVD
     // Frame key for left singular vectors (U)
     public Key<Frame> _u_key;
 
+    // Number of categorical and numeric columns
+    public int _ncats;
+    public int _nnums;
+
+    // Number of good rows in training frame (not skipped)
+    public long _nobs;
+
+    // Total column variance for expanded and transformed data
+    public double _total_variance;
+
+    // Categorical offset vector
+    public int[] _catOffsets;
+
     // If standardized, mean of each numeric data column
     public double[] _normSub;
 
     // If standardized, one over standard deviation of each numeric data column
     public double[] _normMul;
 
+    // Permutation matrix mapping training col indices to adaptedFrame
+    public int[] _permutation;
+
+    // Expanded column names of adapted training frame
+    public String[] _names_expanded;
+
     public SVDOutput(SVD b) { super(b); }
 
-    @Override public ModelCategory getModelCategory() { return Model.ModelCategory.DimReduction; }
+    @Override public ModelCategory getModelCategory() { return ModelCategory.DimReduction; }
   }
 
   public SVDModel(Key selfKey, SVDParameters parms, SVDOutput output) { super(selfKey,parms,output); }
@@ -64,13 +81,13 @@ public class SVDModel extends Model<SVDModel,SVDModel.SVDParameters,SVDModel.SVD
 
       @Override public double[] perRow(double[] dataRow, float[] preds, Model m) { return dataRow; }
 
-      @Override public ModelMetrics makeModelMetrics(Model m, Frame f, double sigma) {
+      @Override public ModelMetrics makeModelMetrics(Model m, Frame f) {
         return m._output.addModelMetrics(new ModelMetricsSVD(m, f));
       }
     }
   }
 
-  @Override protected Frame scoreImpl(Frame orig, Frame adaptedFr, String destination_key) {
+  @Override protected Frame predictScoreImpl(Frame orig, Frame adaptedFr, String destination_key) {
     Frame adaptFrm = new Frame(adaptedFr);
     for(int i = 0; i < _parms._nv; i++)
       adaptFrm.add("PC"+String.valueOf(i+1),adaptFrm.anyVec().makeZero());
@@ -93,30 +110,79 @@ public class SVDModel extends Model<SVDModel,SVDModel.SVDParameters,SVDModel.SVD
 
     f = new Frame((null == destination_key ? Key.make() : Key.make(destination_key)), f.names(), f.vecs());
     DKV.put(f);
-    makeMetricBuilder(null).makeModelMetrics(this, orig, Double.NaN);
+    makeMetricBuilder(null).makeModelMetrics(this, orig);
     return f;
   }
 
   @Override protected double[] score0(double data[/*ncols*/], double preds[/*nclasses+1*/]) {
-    assert data.length == _output._v.length;
+    int numStart = _output._catOffsets[_output._catOffsets.length-1];
+    assert data.length == _output._permutation.length;
+
     for(int i = 0; i < _parms._nv; i++) {
       preds[i] = 0;
-      for (int j = 0; j < data.length; j++)
-        preds[i] += (data[j] - _output._normSub[j]) * _output._normMul[j] * _output._v[j][i];
+      for (int j = 0; j < _output._ncats; j++) {
+        double tmp = data[_output._permutation[j]];
+        int last_cat = _output._catOffsets[j+1]-_output._catOffsets[j]-1;   // Missing categorical values are mapped to extra (last) factor
+        int level = Double.isNaN(tmp) ? last_cat : (int)tmp - (_parms._use_all_factor_levels ? 0:1);  // Reduce index by 1 if first factor level dropped during training
+        if (level < 0 || level > last_cat) continue;  // Skip categorical level in test set but not in train
+        preds[i] += _output._v[_output._catOffsets[j]+level][i];
+      }
+
+      int dcol = _output._ncats;
+      int vcol = numStart;
+      for (int j = 0; j < _output._nnums; j++) {
+        preds[i] += (data[_output._permutation[dcol]] - _output._normSub[j]) * _output._normMul[j] * _output._v[vcol][i];
+        dcol++; vcol++;
+      }
     }
     return preds;
   }
 
   @Override public Frame score(Frame fr, String destination_key) {
     Frame adaptFr = new Frame(fr);
-    adaptTestForTrain(adaptFr, true);   // Adapt
-    Frame output = scoreImpl(fr, adaptFr, destination_key); // Score
-
-    Vec[] vecs = adaptFr.vecs();
-    for (int i = 0; i < vecs.length; i++)
-      if (fr.find(vecs[i]) != -1)   // Exists in the original frame?
-        vecs[i] = null;            // Do not delete it
-    adaptFr.delete();
+    adaptTestForTrain(adaptFr, true, false);   // Adapt
+    Frame output = predictScoreImpl(fr, adaptFr, destination_key); // Score
+    cleanup_adapt( adaptFr, fr );
     return output;
+  }
+
+  @Override protected SB toJavaInit(SB sb, SB fileContextSB) {
+    sb = super.toJavaInit(sb, fileContextSB);
+    sb.ip("public boolean isSupervised() { return " + isSupervised() + "; }").nl();
+    sb.ip("public int nfeatures() { return "+_output.nfeatures()+"; }").nl();
+    sb.ip("public int nclasses() { return "+_parms._nv+"; }").nl();
+
+    if (_output._nnums > 0) {
+      JCodeGen.toStaticVar(sb, "NORMMUL", _output._normMul, "Standardization/Normalization scaling factor for numerical variables.");
+      JCodeGen.toStaticVar(sb, "NORMSUB", _output._normSub, "Standardization/Normalization offset for numerical variables.");
+    }
+    JCodeGen.toStaticVar(sb, "CATOFFS", _output._catOffsets, "Categorical column offsets.");
+    JCodeGen.toStaticVar(sb, "PERMUTE", _output._permutation, "Permutation index vector.");
+    JCodeGen.toStaticVar(sb, "EIGVECS", _output._v, "Eigenvector matrix.");
+    return sb;
+  }
+
+  @Override protected void toJavaPredictBody( final SB bodySb, final SB classCtxSb, final SB fileCtxSb) {
+    SB model = new SB();
+    bodySb.i().p("java.util.Arrays.fill(preds,0);").nl();
+    final int cats = _output._ncats;
+    final int nums = _output._nnums;
+    bodySb.i().p("final int nstart = CATOFFS[CATOFFS.length-1];").nl();
+    bodySb.i().p("for(int i = 0; i < ").p(_parms._nv).p("; i++) {").nl();
+    // Categorical columns
+    bodySb.i(1).p("for(int j = 0; j < ").p(cats).p("; j++) {").nl();
+    bodySb.i(2).p("double d = data[PERMUTE[j]];").nl();
+    bodySb.i(2).p("int last = CATOFFS[j+1]-CATOFFS[j]-1;").nl();
+    bodySb.i(2).p("int c = Double.isNaN(d) ? last : (int)d").p(_parms._use_all_factor_levels ? ";":"-1;").nl();
+    bodySb.i(2).p("if(c < 0 || c > last) continue;").nl();
+    bodySb.i(2).p("preds[i] += EIGVECS[CATOFFS[j]+c][i];").nl();
+    bodySb.i(1).p("}").nl();
+
+    // Numeric columns
+    bodySb.i(1).p("for(int j = 0; j < ").p(nums).p("; j++) {").nl();
+    bodySb.i(2).p("preds[i] += (data[PERMUTE[j" + (cats > 0 ? "+" + cats : "") + "]]-NORMSUB[j])*NORMMUL[j]*EIGVECS[j" + (cats > 0 ? "+ nstart" : "") +"][i];").nl();
+    bodySb.i(1).p("}").nl();
+    bodySb.i().p("}").nl();
+    fileCtxSb.p(model);
   }
 }

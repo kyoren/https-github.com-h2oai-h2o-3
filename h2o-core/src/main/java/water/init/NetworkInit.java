@@ -1,17 +1,19 @@
 package water.init;
 
+import water.H2O;
+import water.H2ONode;
+import water.JettyHTTPD;
+import water.TCPReceiverThread;
+import water.util.Log;
+
 import java.io.*;
 import java.net.*;
 import java.nio.ByteBuffer;
 import java.nio.channels.DatagramChannel;
+import java.nio.channels.ServerSocketChannel;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import water.H2O;
-import water.TCPReceiverThread;
-import water.H2ONode;
-import water.util.Log;
-import java.nio.channels.ServerSocketChannel;
 
 /**
  * Data structure for holding network info specified by the user on the command line.
@@ -315,6 +317,11 @@ public class NetworkInit {
     // Assign initial ports
     H2O.API_PORT = H2O.ARGS.port == 0 ? H2O.ARGS.baseport : H2O.ARGS.port;
 
+    // Late instantiation of Jetty object, if needed.
+    if (H2O.getJetty() == null) {
+      H2O.setJetty(new JettyHTTPD());
+    }
+
     while (true) {
       H2O.H2O_PORT = H2O.API_PORT+1;
       try {
@@ -328,7 +335,9 @@ public class NetworkInit {
         // Enabling SO_REUSEADDR prior to binding the socket using bind(SocketAddress)
         // allows the socket to be bound even though a previous connection is in a timeout state.
         // cnc: this is busted on windows.  Back to the old code.
-        _apiSocket = new ServerSocket(H2O.API_PORT);
+        _apiSocket = H2O.ARGS.ip == null
+                ? new ServerSocket(H2O.API_PORT)
+                : new ServerSocket(H2O.API_PORT, -1/*defaultBacklog*/, H2O.SELF_ADDRESS);
         _apiSocket.setReuseAddress(true);
         // Bind to the UDP socket
         _udpSocket = DatagramChannel.open();
@@ -339,9 +348,11 @@ public class NetworkInit {
         TCPReceiverThread.SOCK = ServerSocketChannel.open();
         TCPReceiverThread.SOCK.socket().setReceiveBufferSize(water.AutoBuffer.TCP_BUF_SIZ);
         TCPReceiverThread.SOCK.socket().bind(isa);
-        
+
+        _apiSocket.close();
+        H2O.getJetty().start(H2O.ARGS.ip, H2O.API_PORT);
         break;
-      } catch (IOException e) {
+      } catch (Exception e) {
         if( _apiSocket != null ) try { _apiSocket.close(); } catch( IOException ohwell ) { Log.err(ohwell); }
         if( _udpSocket != null ) try { _udpSocket.close(); } catch( IOException ie ) { }
         if( TCPReceiverThread.SOCK != null ) try { TCPReceiverThread.SOCK.close(); } catch( IOException ie ) { }
@@ -357,7 +368,8 @@ public class NetworkInit {
       H2O.API_PORT += 2;
     }
     H2O.SELF = H2ONode.self(H2O.SELF_ADDRESS);
-    Log.info("Internal communication uses port: ",H2O.H2O_PORT,"\nListening for HTTP and REST traffic on  http://", H2O.getIpPortString() + "/");
+    Log.info("Internal communication uses port: ", H2O.H2O_PORT, "\n" +
+             "Listening for HTTP and REST traffic on " + H2O.getJetty().getScheme() + "://", H2O.getIpPortString() + "/");
     try { Log.debug("Interface MTU: ",  (NetworkInterface.getByInetAddress(H2O.SELF_ADDRESS)).getMTU());
     } catch (SocketException se) { Log.debug("No MTU due to SocketException. "+se.toString()); }
 

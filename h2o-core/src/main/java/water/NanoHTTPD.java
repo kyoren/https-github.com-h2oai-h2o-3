@@ -8,7 +8,6 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -196,6 +195,13 @@ public class NanoHTTPD
   // ==================================================
 
   /**
+   * Jetty supercedes Nano.
+   */
+  public NanoHTTPD() {
+    myServerSocket = null;
+  }
+
+  /**
    * Starts a HTTP server to given port.<p>
    * Throws an IOException if the socket is already in use
    */
@@ -254,7 +260,7 @@ public class NanoHTTPD
       new NanoHTTPD( new ServerSocket(port), wwwroot );
     } catch( IOException ioe ) {
       Log.err("Couldn't start server:\n", ioe );
-      H2O.exit( -1 );
+      H2O.shutdown( -1 );
     }
 
     myOut.println( "Now serving files in port " + port + " from \"" + wwwroot + "\"" );
@@ -614,7 +620,7 @@ public class NanoHTTPD
                       "\"name\" : "         + "\"" + keyName      + "\", " +
                       "\"total_bytes\" : "  +        length       + " " +
                       "}";
-              sendResponse(HTTP_OK, MIME_JSON, null, new ByteArrayInputStream(responsePayload.getBytes(StandardCharsets.UTF_8)));
+              sendResponse(HTTP_OK, MIME_JSON, null, new ByteArrayInputStream(responsePayload.getBytes("UTF-8")));
               return true;
             }
           }
@@ -645,7 +651,7 @@ public class NanoHTTPD
               UploadFileVec.readPut(destination_key, new InputStreamWrapper(in, boundary.getBytes()), stats);
               // TODO: Figure out how to marshal a response here Ray-style so that docs, etc. are generated properly.
               String responsePayload = "{ \"destination_frame\": \"" + destination_key + "\", \"total_bytes\": " + stats.total_bytes + " }\n";
-              sendResponse(HTTP_OK, MIME_JSON, null, new ByteArrayInputStream(responsePayload.getBytes(StandardCharsets.UTF_8)));
+              sendResponse(HTTP_OK, MIME_JSON, null, new ByteArrayInputStream(responsePayload.getBytes("UTF-8")));
               return true;
             }
           }
@@ -804,7 +810,7 @@ public class NanoHTTPD
       }
 
       if (H2O.getShutdownRequested()) {
-        H2O.shutdown();
+        H2O.shutdown(0);
       }
     }
 

@@ -7,9 +7,9 @@ import water.fvec.Chunk;
 import water.fvec.Frame;
 import water.fvec.NewChunk;
 import water.fvec.Vec;
-import water.nbhm.NonBlockingHashMap;
 import water.nbhm.NonBlockingHashSet;
 import water.nbhm.UtilUnsafe;
+import water.util.IcedHashMap;
 import water.util.Log;
 
 import java.util.*;
@@ -47,12 +47,13 @@ import java.util.concurrent.atomic.AtomicInteger;
  *  Aggregations on time and numeric columns only.
  */
   public class ASTGroupBy extends ASTUniPrefixOp {
-  // AST: (GB fr {cols} AGGS)
-  //      (GB %k {#1;#3} (AGGS #2 "min" #4 "mean" #6))
+  // AST: (GB fr cols AGGS ORDERBY)
+  //      (GB %k (llist #1;#3) (AGGS #2 "min" #4 "mean" #6) ())  for no order by..., otherwise is a llist or single number
   private long[] _gbCols; // group by columns
   private AGG[] _agg;
   private AST[] _gbColsDelayed;
   private String[] _gbColsDelayedByName;
+  private long[] _orderByCols;
   ASTGroupBy() { super(null); }
   @Override String opStr() { return "GB"; }
   @Override ASTOp make() {return new ASTGroupBy();}
@@ -68,6 +69,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
     //parse AGGs
     _agg = ((AGG)E.parse())._aggs;
+
+    // parse order by
+    s = E.parse();
+    if( s instanceof ASTLongList ) _orderByCols = ((ASTLongList)s)._l;
+    else if( s instanceof ASTNum ) _orderByCols = new long[]{(long)((ASTNum)s)._d};
+    else if( s instanceof ASTNull) _orderByCols = null;
+    else throw new IllegalArgumentException("Order by column must be an index or list of indexes. Got " + s.getClass());
+
     E.eatEnd();
     ASTGroupBy res = (ASTGroupBy)clone();
     res._asts = new AST[]{ary};
@@ -90,7 +99,11 @@ import java.util.concurrent.atomic.AtomicInteger;
     while( tmpGrps[nGrps-1]==null ) nGrps--;
     final G[] grps = new G[nGrps];
     System.arraycopy(tmpGrps,0,grps,0,nGrps);
-    H2O.submitTask(new ParallelPostGlobal(grps,nGrps)).join();
+    H2O.submitTask(new ParallelPostGlobal(grps,nGrps,_orderByCols)).join();
+
+    // apply an ORDER by here...
+    if( _orderByCols != null )
+      Arrays.sort(grps);
 
     // build the output
     final int nCols = _gbCols.length+_agg.length;
@@ -137,7 +150,7 @@ import java.util.concurrent.atomic.AtomicInteger;
           }
         }
       }
-    }.doAll(nCols,v).outputFrame(Key.make(),names,domains);
+    }.doAll(nCols,v).outputFrame(names,domains);
     p1._g=null;
     Keyed.remove(v._key);
     e.pushAry(f);
@@ -206,42 +219,13 @@ import java.util.concurrent.atomic.AtomicInteger;
     @Override public Iterator<T> iterator() {return _g.iterator(); }
   }
 
-  // custom serializer for <Group,Int> pairs
-  public static class IcedHM<G extends Iced,S extends String> extends Iced {
-    private NonBlockingHashMap<G,String> _m; // the nbhm to (de)ser
-    IcedHM() { _m = new NonBlockingHashMap<>(); }
-    String putIfAbsent(G k, S v) { return _m.putIfAbsent(k,v);}
-    void put(G g, S i) { _m.put(g,i);}
-    void putAll(IcedHM<G,S> m) {_m.putAll(m._m);}
-    Set<G> keySet() { return _m.keySet(); }
-    int size() { return _m.size(); }
-    String get(G g) { return _m.get(g); }
-    G getk(G g) { return _m.getk(g); }
-    @Override public AutoBuffer write_impl(AutoBuffer ab) {
-      if( _m==null || _m.size()==0 ) return ab.put4(0);
-      else {
-        ab.put4(_m.size());
-        for(G g:_m.keySet()) { ab.put(g); ab.putStr(_m.get(g)); }
-      }
-      return ab;
-    }
-    @Override public IcedHM read_impl(AutoBuffer ab) {
-      int mLen;
-      if( (mLen=ab.get4())!=0 ) {
-        _m = new NonBlockingHashMap<>();
-        for( int i=0;i<mLen;++i ) _m.put((G)ab.get(), ab.getStr());
-      }
-      return this;
-    }
-  }
-
   public static class GBTask extends MRTask<GBTask> {
-    IcedHM<G,String> _g;  // lol GString
+    IcedHashMap<G,String> _g;
     private long[] _gbCols;
     private AGG[] _agg;
     GBTask(long[] gbCols, AGG[] agg) { _gbCols=gbCols; _agg=agg; }
-    @Override public void setupLocal() { _g = new IcedHM<>(); }
     @Override public void map(Chunk[] c) {
+      _g = new IcedHashMap<>();
       long start = c[0].start();
       byte[] naMethods = AGG.naMethods(_agg);
       G g = new G(_gbCols.length,_agg.length,naMethods);
@@ -252,11 +236,7 @@ import java.util.concurrent.atomic.AtomicInteger;
         if( g_old==null ) {  // won the race w/ this group
           gOld=g;
           g=new G(_gbCols.length,_agg.length,naMethods); // need entirely new G
-        } else {
-          gOld=_g.getk(g);
-          if( gOld==null )   // FIXME: Why is gOld null!?
-            while( gOld==null ) gOld=_g.getk(g);
-        }
+        } else gOld=_g.getk(g);
         // cas in COUNT
         long r=gOld._N;
         while(!G.CAS_N(gOld, r, r + 1))
@@ -266,8 +246,8 @@ import java.util.concurrent.atomic.AtomicInteger;
     }
     @Override public void reduce(GBTask t) {
       if( _g!=t._g ) {
-        IcedHM<G,String> l = _g;
-        IcedHM<G,String> r = t._g;
+        IcedHashMap<G,String> l = _g;
+        IcedHashMap<G,String> r = t._g;
         if( l.size() < r.size() ) { l=r; r=_g; }  // larger on the left
         // loop over the smaller set of grps
         for( G rg:r.keySet() ) {
@@ -302,13 +282,11 @@ import java.util.concurrent.atomic.AtomicInteger;
 
         if( (type=agg[i]._type) == AGG.T_N ) continue; //immediate short circuit if COUNT
 
-        // Do NA handling here for AGG.T_IG and AGG.T_RM
         if( c!= null )
           if( !agg[i].isAll() && c[col].isNA(chkRow) )
             continue;
 
         // build up a long[] of vals, to handle the case when c is and isn't null.
-        // c is null in the reduce  of the MRTask
         long bits=-1;
         if( c!=null ) {
           if( c[col].isNA(chkRow) ) continue;
@@ -380,9 +358,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 
   private static class GTask extends H2O.H2OCountedCompleter<GTask> {
     private final G _g;
-    GTask(H2O.H2OCountedCompleter cc, G g) { super(cc); _g=g; }
+    private final long[] _orderByCols;
+    GTask(H2O.H2OCountedCompleter cc, G g,long[] orderByCols) { super(cc); _g=g; _orderByCols=orderByCols; }
     @Override protected void compute2() {
       _g.close();
+      int[] orderByCols = _orderByCols==null?null:new int[_orderByCols.length];
+      if( orderByCols != null )
+        for(int i=0;i<orderByCols.length;++i) orderByCols[i]=(int)_orderByCols[i];
+      _g._orderByCols=orderByCols;
       tryComplete();
     }
   }
@@ -390,9 +373,10 @@ import java.util.concurrent.atomic.AtomicInteger;
   public static class ParallelPostGlobal extends H2O.H2OCountedCompleter<ParallelPostGlobal> {
     private final G[] _g;
     private final int _ngrps;
+    private final long[] _orderByCols;
     private final int _maxP=50*1000; // burn 50K at a time
     private final AtomicInteger _ctr;
-    ParallelPostGlobal(G[] g, int ngrps) { _g=g; _ctr=new AtomicInteger(_maxP-1); _ngrps=ngrps; }
+    ParallelPostGlobal(G[] g, int ngrps, long[] orderByCols) { _g=g; _ctr=new AtomicInteger(_maxP-1); _ngrps=ngrps; _orderByCols = orderByCols; }
 
 
     @Override protected void compute2(){
@@ -400,7 +384,7 @@ import java.util.concurrent.atomic.AtomicInteger;
       for( int i=0;i<Math.min(_g.length,_maxP);++i) frkTsk(i);
     }
 
-    private void frkTsk(final int i) { new GTask(new Callback(), _g[i]).fork(); }
+    private void frkTsk(final int i) { new GTask(new Callback(), _g[i], _orderByCols).fork(); }
 
     private class Callback extends H2O.H2OCallback {
       public Callback(){super(ParallelPostGlobal.this);}
@@ -444,7 +428,8 @@ import java.util.concurrent.atomic.AtomicInteger;
     }
   }
 
-  public static class G extends Iced {
+  public static class G extends Iced implements Comparable<G> {
+    public int[] _orderByCols;  // set during the ParallelPostGlobal if there is to be any order by
     public final double _ds[];  // Array is final; contents change with the "fill"
     public int _hash;           // Hash is not final; changes with the "fill"
     public G fill(int row, Chunk chks[], long cols[]) {
@@ -465,6 +450,17 @@ import java.util.concurrent.atomic.AtomicInteger;
       return o instanceof G && Arrays.equals(_ds, ((G) o)._ds); }
     @Override public int hashCode() { return _hash; }
     @Override public String toString() { return Arrays.toString(_ds); }
+
+    // compare 2 groups
+    // iterate down _ds, stop when _ds[i] > that._ds[i], or _ds[i] < that._ds[i]
+    // order by various columns specified by _orderByCols
+    // NaN is treated as least
+    @Override public int compareTo(G g) {
+      for(int i:_orderByCols)
+        if(      Double.isNaN(_ds[i])   || _ds[i] < g._ds[i] ) return -1;
+        else if( Double.isNaN(g._ds[i]) || _ds[i] > g._ds[i] ) return 1;
+      return 0;
+    }
 
     public long     _N;         // number of rows in the group, updated atomically
     public long[]   _ND;        // count of distincts, built from the NBHS<Double>
@@ -573,6 +569,7 @@ import java.util.concurrent.atomic.AtomicInteger;
         aggs.add(new AGG(type,col,na,name,delayedColByName,delayedCol));
       }
       _aggs = aggs.toArray(new AGG[aggs.size()]);
+      E.eatEnd();
       return this;
     }
 

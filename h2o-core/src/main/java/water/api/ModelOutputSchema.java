@@ -1,6 +1,7 @@
 package water.api;
 
 import hex.Model;
+import hex.ModelCategory;
 import water.Weaver;
 import water.util.IcedHashMap;
 import water.util.Log;
@@ -14,14 +15,20 @@ import java.lang.reflect.Field;
  */
 public class ModelOutputSchema<O extends Model.Output, S extends ModelOutputSchema<O, S>> extends Schema<O, S> {
 
-  @API(help="Column names.", direction=API.Direction.OUTPUT)
+  @API(help="Column names", direction=API.Direction.OUTPUT)
   public String[] names;
 
-  @API(help="Domains for categorical (enum) columns.", direction=API.Direction.OUTPUT, level=API.Level.expert)
+  @API(help="Domains for categorical (enum) columns", direction=API.Direction.OUTPUT, level=API.Level.expert)
   public String[][] domains;
 
-  @API(help="Category of the model (e.g., Binomial).", values={"Unknown", "Binomial", "Multinomial", "Regression", "Clustering", "AutoEncoder", "DimReduction"}, direction=API.Direction.OUTPUT)
-  public Model.ModelCategory model_category;
+  @API(help="Cross-validation models (model ids)", direction=API.Direction.OUTPUT, level=API.Level.expert)
+  public KeyV3.ModelKeyV3[] cross_validation_models;
+
+  @API(help="Cross-validation predictions (frame ids)", direction=API.Direction.OUTPUT, level=API.Level.expert)
+  public KeyV3.FrameKeyV3[] cross_validation_predictions;
+
+  @API(help="Category of the model (e.g., Binomial)", values={"Unknown", "Binomial", "Multinomial", "Regression", "Clustering", "AutoEncoder", "DimReduction"}, direction=API.Direction.OUTPUT)
+  public ModelCategory model_category;
 
   @API(help="Model summary", direction=API.Direction.OUTPUT, level=API.Level.critical)
   TwoDimTableBase model_summary;
@@ -34,6 +41,9 @@ public class ModelOutputSchema<O extends Model.Output, S extends ModelOutputSche
 
   @API(help="Validation data model metrics", direction=API.Direction.OUTPUT, level=API.Level.critical)
   ModelMetricsBase validation_metrics;
+
+  @API(help="Cross-validation model metrics", direction=API.Direction.OUTPUT, level=API.Level.critical)
+  ModelMetricsBase cross_validation_metrics;
 
   @API(help="Help information for output fields", direction=API.Direction.OUTPUT)
   public IcedHashMap.IcedHashMapStringString help;

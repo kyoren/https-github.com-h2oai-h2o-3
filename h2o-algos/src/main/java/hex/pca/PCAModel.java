@@ -1,30 +1,37 @@
 package hex.pca;
 
-import hex.DataInfo;
-import hex.Model;
-import hex.ModelMetrics;
-import hex.ModelMetricsPCA;
+import hex.*;
 import water.DKV;
 import water.Key;
 import water.MRTask;
 import water.fvec.Chunk;
 import water.fvec.Frame;
-import water.fvec.Vec;
+import water.util.JCodeGen;
+import water.util.SB;
 import water.util.TwoDimTable;
 
 public class PCAModel extends Model<PCAModel,PCAModel.PCAParameters,PCAModel.PCAOutput> {
 
   public static class PCAParameters extends Model.Parameters {
-    public DataInfo.TransformType _transform = DataInfo.TransformType.NONE; // Data transformation (demean to compare with PCA)
-    public int _k = 1;                // Number of principal components
+    public DataInfo.TransformType _transform = DataInfo.TransformType.NONE; // Data transformation
+    public Method _pca_method = Method.GramSVD;   // Method for computing PCA
+    public int _k = 1;                     // Number of principal components
     public int _max_iterations = 1000;     // Max iterations
     public long _seed = System.nanoTime(); // RNG seed
-    public Key<Frame> _loading_key;
-    public boolean _keep_loading = true;
+    public boolean _use_all_factor_levels = false;   // When expanding categoricals, should first level be kept or dropped?
+    public boolean _compute_metrics = true;   // Should a second pass be made through data to compute metrics?
+
+    public enum Method {
+      GramSVD, Power, GLRM
+    }
   }
 
   public static class PCAOutput extends Model.Output {
+    // GLRM final value of L2 loss function
+    public double _objective;
+
     // Principal components (eigenvectors)
+    public double[/*feature*/][/*k*/] _eigenvectors_raw;
     public TwoDimTable _eigenvectors;
 
     // Standard deviation of each principal component
@@ -32,7 +39,20 @@ public class PCAModel extends Model<PCAModel,PCAModel.PCAParameters,PCAModel.PCA
 
     // Importance of principal components
     // Standard deviation, proportion of variance explained, and cumulative proportion of variance explained
-    public TwoDimTable _pc_importance;
+    public TwoDimTable _importance;
+
+    // Number of categorical and numeric columns
+    public int _ncats;
+    public int _nnums;
+
+    // Number of good rows in training frame (not skipped)
+    public long _nobs;
+
+    // Total column variance for expanded and transformed data
+    public double _total_variance;
+
+    // Categorical offset vector
+    public int[] _catOffsets;
 
     // If standardized, mean of each numeric data column
     public double[] _normSub;
@@ -40,7 +60,10 @@ public class PCAModel extends Model<PCAModel,PCAModel.PCAParameters,PCAModel.PCA
     // If standardized, one over standard deviation of each numeric data column
     public double[] _normMul;
 
-    // Frame key for projection into principal component space
+    // Permutation matrix mapping training col indices to adaptedFrame
+    public int[] _permutation;
+
+    // Frame key for right singular vectors from SVD
     public Key<Frame> _loading_key;
 
     public PCAOutput(PCA b) { super(b); }
@@ -63,7 +86,7 @@ public class PCAModel extends Model<PCAModel,PCAModel.PCAParameters,PCAModel.PCA
   }
 
   @Override
-  protected Frame scoreImpl(Frame orig, Frame adaptedFr, String destination_key) {
+  protected Frame predictScoreImpl(Frame orig, Frame adaptedFr, String destination_key) {
     Frame adaptFrm = new Frame(adaptedFr);
     for(int i = 0; i < _parms._k; i++)
       adaptFrm.add("PC"+String.valueOf(i+1),adaptFrm.anyVec().makeZero());
@@ -86,17 +109,32 @@ public class PCAModel extends Model<PCAModel,PCAModel.PCAParameters,PCAModel.PCA
 
     f = new Frame((null == destination_key ? Key.make() : Key.make(destination_key)), f.names(), f.vecs());
     DKV.put(f);
-    makeMetricBuilder(null).makeModelMetrics(this, orig, Double.NaN);
+    makeMetricBuilder(null).makeModelMetrics(this, orig);
     return f;
   }
 
   @Override
-  protected double[] score0(double data[/*ncols*/], double preds[/*nclasses+1*/]) {
-    assert data.length == _output._eigenvectors.getRowDim();
+  protected double[] score0(double data[/*ncols*/], double preds[/*k*/]) {
+    int numStart = _output._catOffsets[_output._catOffsets.length-1];
+    assert data.length == _output._nnums + _output._ncats;
+
     for(int i = 0; i < _parms._k; i++) {
       preds[i] = 0;
-      for (int j = 0; j < data.length; j++)
-        preds[i] += (data[j] - _output._normSub[j]) * _output._normMul[j] * (double)_output._eigenvectors.get(j,i);
+      for (int j = 0; j < _output._ncats; j++) {
+        double tmp = data[_output._permutation[j]];
+        if (Double.isNaN(tmp)) continue;    // Missing categorical values are skipped
+        int last_cat = _output._catOffsets[j+1]-_output._catOffsets[j]-1;
+        int level = (int)tmp - (_parms._use_all_factor_levels ? 0:1);  // Reduce index by 1 if first factor level dropped during training
+        if (level < 0 || level > last_cat) continue;  // Skip categorical level in test set but not in train
+        preds[i] += _output._eigenvectors_raw[_output._catOffsets[j]+level][i];
+      }
+
+      int dcol = _output._ncats;
+      int vcol = numStart;
+      for (int j = 0; j < _output._nnums; j++) {
+        preds[i] += (data[_output._permutation[dcol]] - _output._normSub[j]) * _output._normMul[j] * _output._eigenvectors_raw[vcol][i];
+        dcol++; vcol++;
+      }
     }
     return preds;
   }
@@ -104,14 +142,50 @@ public class PCAModel extends Model<PCAModel,PCAModel.PCAParameters,PCAModel.PCA
   @Override
   public Frame score(Frame fr, String destination_key) {
     Frame adaptFr = new Frame(fr);
-    adaptTestForTrain(adaptFr, true);   // Adapt
-    Frame output = scoreImpl(fr, adaptFr, destination_key); // Score
-
-    Vec[] vecs = adaptFr.vecs();
-    for (int i = 0; i < vecs.length; i++)
-      if (fr.find(vecs[i]) != -1) // Exists in the original frame?
-        vecs[i] = null;            // Do not delete it
-    adaptFr.delete();
+    adaptTestForTrain(adaptFr, true, false);   // Adapt
+    Frame output = predictScoreImpl(fr, adaptFr, destination_key); // Score
+    cleanup_adapt( adaptFr, fr );
     return output;
+  }
+
+  @Override protected SB toJavaInit(SB sb, SB fileContextSB) {
+    sb = super.toJavaInit(sb, fileContextSB);
+    sb.ip("public boolean isSupervised() { return " + isSupervised() + "; }").nl();
+    sb.ip("public int nfeatures() { return "+_output.nfeatures()+"; }").nl();
+    sb.ip("public int nclasses() { return "+_parms._k+"; }").nl();
+
+    if (_output._nnums > 0) {
+      JCodeGen.toStaticVar(sb, "NORMMUL", _output._normMul, "Standardization/Normalization scaling factor for numerical variables.");
+      JCodeGen.toStaticVar(sb, "NORMSUB", _output._normSub, "Standardization/Normalization offset for numerical variables.");
+    }
+    JCodeGen.toStaticVar(sb, "CATOFFS", _output._catOffsets, "Categorical column offsets.");
+    JCodeGen.toStaticVar(sb, "PERMUTE", _output._permutation, "Permutation index vector.");
+    JCodeGen.toStaticVar(sb, "EIGVECS", _output._eigenvectors_raw, "Eigenvector matrix.");
+    return sb;
+  }
+
+  @Override protected void toJavaPredictBody( final SB bodySb, final SB classCtxSb, final SB fileCtxSb) {
+    SB model = new SB();
+    bodySb.i().p("java.util.Arrays.fill(preds,0);").nl();
+    final int cats = _output._ncats;
+    final int nums = _output._nnums;
+    bodySb.i().p("final int nstart = CATOFFS[CATOFFS.length-1];").nl();
+    bodySb.i().p("for(int i = 0; i < ").p(_parms._k).p("; i++) {").nl();
+    // Categorical columns
+    bodySb.i(1).p("for(int j = 0; j < ").p(cats).p("; j++) {").nl();
+    bodySb.i(2).p("double d = data[PERMUTE[j]];").nl();
+    bodySb.i(2).p("if(Double.isNaN(d)) continue;").nl();
+    bodySb.i(2).p("int last = CATOFFS[j+1]-CATOFFS[j]-1;").nl();
+    bodySb.i(2).p("int c = (int)d").p(_parms._use_all_factor_levels ? ";":"-1;").nl();
+    bodySb.i(2).p("if(c < 0 || c > last) continue;").nl();
+    bodySb.i(2).p("preds[i] += EIGVECS[CATOFFS[j]+c][i];").nl();
+    bodySb.i(1).p("}").nl();
+
+    // Numeric columns
+    bodySb.i(1).p("for(int j = 0; j < ").p(nums).p("; j++) {").nl();
+    bodySb.i(2).p("preds[i] += (data[PERMUTE[j" + (cats > 0 ? "+" + cats : "") + "]]-NORMSUB[j])*NORMMUL[j]*EIGVECS[j" + (cats > 0 ? "+ nstart" : "") +"][i];").nl();
+    bodySb.i(1).p("}").nl();
+    bodySb.i().p("}").nl();
+    fileCtxSb.p(model);
   }
 }

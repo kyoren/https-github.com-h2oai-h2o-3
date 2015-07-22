@@ -4,14 +4,14 @@ import java.io.*;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.ArrayList;
-
+import water.Key;
 import water.H2O;
 import water.exceptions.H2OParseException;
 import water.exceptions.H2OParseSetupException;
 import water.util.UnsafeUtils;
 
 class XlsParser extends Parser {
-  XlsParser( ParseSetup ps ) { super(ps); }
+  XlsParser( ParseSetup ps, Key jobKey ) { super(ps, jobKey); }
   @Override
   ParseWriter parseChunk(int cidx, final ParseReader din, final ParseWriter dout) { throw H2O.unimpl(); }
 
@@ -79,7 +79,7 @@ class XlsParser extends Parser {
   /** Try to parse the bytes as XLS format  */
   public static ParseSetup guessSetup( byte[] bytes ) {
     XlsParser p = new XlsParser(new ParseSetup(ParserType.XLS, ParseSetup.GUESS_SEP, false,
-                                ParseSetup.GUESS_HEADER, ParseSetup.GUESS_COL_CNT, null, null, null, null, null));
+                                ParseSetup.GUESS_HEADER, ParseSetup.GUESS_COL_CNT, null, null, null, null, null), null);
     p._buf = bytes;             // No need to copy already-unpacked data; just use it directly
     p._lim = bytes.length;
     PreviewParseWriter dout = new PreviewParseWriter();
@@ -530,12 +530,12 @@ class XlsParser extends Parser {
         _nineteenFour = data.get1(pos+4) == 1;
         break;
       case SPREADSHEET_EXCEL_READER_TYPE_BOUNDSHEET:
-        int rec_offset = data.get4(pos+4);
-        int rec_length = data.get1(pos+10);
-        String rec_name = version == SPREADSHEET_EXCEL_READER_BIFF8
-          ? data.getStr(pos+12, rec_length*(data.get1(pos+11) == 0 ? 1 : 2))
-          : data.getStr(pos+11, rec_length);
-        _boundsheets.add(new Sheet(data,dout,rec_name,rec_offset));
+        int recOffset = data.get4(pos+4);
+        int recLength = data.get1(pos+10);
+        String recName = version == SPREADSHEET_EXCEL_READER_BIFF8
+          ? data.getStr(pos+12, recLength*(data.get1(pos+11) == 0 ? 1 : 2))
+          : data.getStr(pos+11, recLength);
+        _boundsheets.add(new Sheet(data,dout,recName,recOffset));
         break;
       default:
         // nothing; ignore this block typed
@@ -785,12 +785,12 @@ class XlsParser extends Parser {
           //row2   = ord(this->_data[spos+2]) | ord(this->_data[spos+3])<<8;
           //column = ord(this->_data[spos+4]) | ord(this->_data[spos+5])<<8;
           //column2 = ord(this->_data[spos+6]) | ord(this->_data[spos+7])<<8;
-          //link_data = Array();
+          //linkData = Array();
           //flags = ord(this->_data[spos + 28]);
           //udesc = "";
           //ulink = "";
           //uloc = 32;
-          //link_data['flags'] = flags;
+          //linkData['flags'] = flags;
           //if ((flags & 1) > 0 ) {   // is a type we understand
           //  //  is there a description ?
           //  if ((flags & 0x14) == 0x14 ) {   // has a description
@@ -804,11 +804,11 @@ class XlsParser extends Parser {
           //    udesc = ulink;
           //  }
           //}
-          //link_data['desc'] = udesc;
-          //link_data['link'] = this->_encodeUTF16(ulink);
+          //linkData['desc'] = udesc;
+          //linkData['link'] = this->_encodeUTF16(ulink);
           //for (r=row; r<=row2; r++) { 
           //  for (c=column; c<=column2; c++) {
-          //    this['cellsInfo'][r+1][c+1]['hyperlink'] = link_data;
+          //    this['cellsInfo'][r+1][c+1]['hyperlink'] = linkData;
           //  }
           //}
           //break;

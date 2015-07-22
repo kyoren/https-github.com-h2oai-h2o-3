@@ -8,7 +8,7 @@ source('../../h2o-runit.R')
 
 test.GLM.getLambdaModel <- function(conn) {
 print("Read data")
-pros.hex = h2o.importFile(conn,normalizePath(locate("smalldata/logreg/prostate.csv")), key="pros.hex")
+pros.hex = h2o.importFile(conn,normalizePath(locate("smalldata/logreg/prostate.csv")), destination_key="pros.hex")
 
 myX = c("AGE","RACE","DPROS","DCAPS","PSA","VOL","GLEASON")
 myY = "CAPSULE"
@@ -17,7 +17,7 @@ family = sample(c("gaussian","binomial"),1)
 print(family)
 
 print("Do lambda search and build models")
-my.glm = h2o.glm(x=myX, y=myY, training_frame=pros.hex, family=family, standardize=T, use_all_factor_levels=TRUE, lambda_search=T)
+my.glm = h2o.glm(x=myX, y=myY, training_frame=pros.hex, family=family, standardize=T, lambda_search=T)
 
 print("the models were built over the following lambda values  - ")
 all_lambdas = my.glm@models[[1]]@model$params$lambda_all

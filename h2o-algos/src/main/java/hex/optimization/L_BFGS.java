@@ -1,5 +1,6 @@
 package hex.optimization;
 
+import hex.glm.GLM;
 import water.Iced;
 import water.MemoryManager;
 import water.util.ArrayUtils;
@@ -39,7 +40,9 @@ import java.util.Random;
 */
 public final class L_BFGS extends Iced {
   int _maxIter = 500;
+  int _minIter = 0;
   double _gradEps = 1e-8;
+  double _objEps = 1e-4;
   // line search params
   int _historySz = 20;
 
@@ -47,7 +50,9 @@ public final class L_BFGS extends Iced {
 
   public L_BFGS() {}
   public L_BFGS setMaxIter(int m) {_maxIter = m; return this;}
+  public L_BFGS setMinIter(int m) {_minIter = m; return this;}
   public L_BFGS setGradEps(double d) {_gradEps = d; return this;}
+  public L_BFGS setObjEps(double d) {_objEps = d; return this;}
   public L_BFGS setHistorySz(int sz) {_historySz = sz; return this;}
 
 
@@ -101,7 +106,7 @@ public final class L_BFGS extends Iced {
      * @param pk   - search direction
      * @return objective values evaluated at k line-search points beta + pk*step[k]
      */
-    public abstract double [] getObjVals(double[] beta, double[] pk, int nSteps, double stepDec);
+    public abstract double [] getObjVals(double[] beta, double[] pk, int nSteps, double initialStep, double stepDec);
 
 
     /**
@@ -113,12 +118,15 @@ public final class L_BFGS extends Iced {
      * @return
      */
     public LineSearchSol doLineSearch(GradientInfo ginfo, double [] beta, double [] direction, int nSteps, double tdec) {
-      double [] objVals = getObjVals(beta, direction, nSteps, tdec);
+      double [] objVals = null;
       double t = 1;
-      for (int i = 0; i < objVals.length; ++i) {
-        if (admissibleStep(t, ginfo._objVal, objVals[i], direction, ginfo._gradient))
-          return new LineSearchSol(true, objVals[i], t);
-        t *= tdec;
+      while(t > GLM.MINLINE_SEARCH_STEP) {
+        objVals = getObjVals(beta, direction, nSteps, t, tdec);
+        for (int i = 0; i < objVals.length; ++i) {
+          if (admissibleStep(t, ginfo._objVal, objVals[i], direction, ginfo._gradient))
+            return new LineSearchSol(true, objVals[i], t);
+          t *= tdec;
+        }
       }
       return new LineSearchSol(objVals[objVals.length-1] < ginfo._objVal, objVals[objVals.length-1], t/tdec);
     }
@@ -138,11 +146,13 @@ public final class L_BFGS extends Iced {
     public final int iter;
     public final double [] coefs;
     public final GradientInfo ginfo;
+    public final boolean converged;
 
-    public Result(int iter, double [] coefs, GradientInfo ginfo){
+    public Result(boolean converged, int iter, double [] coefs, GradientInfo ginfo){
       this.iter = iter;
       this.coefs = coefs;
       this.ginfo = ginfo;
+      this.converged = converged;
     }
 
     public String toString(){
@@ -253,17 +263,18 @@ public final class L_BFGS extends Iced {
     int iter = 0;
     boolean doLineSearch = true;
     int ls_switch = 0;
-    final double gEps = Math.min(_gradEps*beta.length,Math.max(MathUtils.l2norm2(ginfo._gradient)*1e-1,1e-15));
-    while(pm.progress(beta, ginfo) && MathUtils.l2norm2(ginfo._gradient) > gEps && iter != _maxIter) {
-//      System.out.println("objVal = " + ginfo._objVal + ", gradNorm = " + MathUtils.l2norm2(ginfo._gradient) + ", doLineSearch = " + doLineSearch);
+    double rel_improvement = 1;
+    boolean converged = false;
+    while(pm.progress(beta, ginfo) &&  (iter < _minIter || ArrayUtils.linfnorm(ginfo._gradient,false) > _gradEps  && rel_improvement > _objEps) && iter != _maxIter) {
       double [] pk = _hist.getSearchDirection(ginfo._gradient);
       if(ArrayUtils.hasNaNsOrInfs(pk)) {
         Log.warn("LBFGS: Got NaNs in search direction.");
         break; //
       }
-      double lsVal = Double.POSITIVE_INFINITY;
+      LineSearchSol ls = null;
+
       if(doLineSearch) {
-        LineSearchSol ls = gslvr.doLineSearch(ginfo, beta, pk, 24, .5);
+        ls = gslvr.doLineSearch(ginfo, beta, pk, 24, .5);
         if(ls.step == 1) {
           if (++ls_switch == 2) {
             ls_switch = 0;
@@ -273,20 +284,22 @@ public final class L_BFGS extends Iced {
           ls_switch = 0;
         }
         if (ls.madeProgress || _hist._k < 2) {
-          lsVal = ls.objVal;
           ArrayUtils.wadd(beta, pk, ls.step);
-        } else break; // ls did not make progress => converged
+        } else {
+          break; // ls did not make progress => converged
+        }
       } else  ArrayUtils.add(beta, pk);
       GradientInfo newGinfo = gslvr.getGradient(beta); // expensive / distributed
-      if(doLineSearch && !(Double.isNaN(lsVal) && Double.isNaN(newGinfo._objVal)) && Math.abs(lsVal - newGinfo._objVal) > 1e-10*lsVal)
-        throw new IllegalArgumentException("L-BFGS: Got invalid gradient solver, objective values from line-search and gradient tasks differ, " + lsVal + " != " + newGinfo._objVal);
+      if(doLineSearch && !(Double.isNaN(ls.objVal) && Double.isNaN(newGinfo._objVal)) && Math.abs(ls.objVal - newGinfo._objVal) > 1e-10*ls.objVal) {
+        throw new IllegalArgumentException("L-BFGS: Got invalid gradient solver, objective values from line-search and gradient tasks differ, " + ls.objVal + " != " + newGinfo._objVal + ", step = " + ls.step);
+      }
       if(!doLineSearch) //{
         if(!admissibleStep(1,ginfo._objVal,newGinfo._objVal,pk,ginfo._gradient)) {
           if(++ls_switch == 2) {
             doLineSearch = true;
             ls_switch = 0;
           }
-          if(ginfo._objVal < newGinfo._objVal && (newGinfo._objVal - ginfo._objVal > .001*ginfo._objVal)) {
+          if(ginfo._objVal < newGinfo._objVal && (newGinfo._objVal - ginfo._objVal > _objEps*ginfo._objVal)) {
             doLineSearch = true;
             ArrayUtils.subtract(beta,pk,beta);
             continue;
@@ -294,9 +307,10 @@ public final class L_BFGS extends Iced {
         } else ls_switch = 0;
       ++iter;
       _hist.update(pk, newGinfo._gradient, ginfo._gradient);
+      rel_improvement = (ginfo._objVal - newGinfo._objVal)/ginfo._objVal;
       ginfo = newGinfo;
     }
-    return new Result(iter,beta, ginfo);
+    return new Result(iter < _maxIter || ArrayUtils.linfnorm(ginfo._gradient,false) < _gradEps || rel_improvement < _objEps,iter,beta, ginfo);
   }
 
   public static double [] startCoefs(int n, long seed){

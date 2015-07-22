@@ -51,7 +51,7 @@ public class Job<T extends Keyed> extends Keyed {
   transient H2OCountedCompleter _barrier;// Top-level task you can block on
 
   /** Jobs produce a single DKV result into Key _dest */
-  public final Key<T> _dest;   // Key for result
+  public Key<T> _dest;   // Key for result
   /** Since _dest is public final, not sure why we have a getter but some
    *  people like 'em. */
   public final Key<T> dest() { return _dest; }
@@ -133,7 +133,8 @@ public class Job<T extends Keyed> extends Keyed {
    *  @see H2OCountedCompleter
    */
   public Job<T> start(final H2OCountedCompleter fjtask, long work) {
-    DKV.put(_progressKey = Key.make(), new Progress(work));
+    if (work >= 0)
+      DKV.put(_progressKey = createProgressKey(), new Progress(work));
     assert _state == JobState.CREATED : "Trying to run job which was already run?";
     assert fjtask != null : "Starting a job with null working task is not permitted!";
     assert fjtask.getCompleter() == null : "Cannot have a completer; this must be a top-level task";
@@ -174,6 +175,10 @@ public class Job<T extends Keyed> extends Keyed {
     H2O.submitTask(fjtask);
     return this;
   }
+
+  protected Key createProgressKey() { return Key.make(); }
+
+  protected boolean deleteProgressKey() { return true; }
 
   /** Blocks and get result of this job.
    * <p>
@@ -221,7 +226,7 @@ public class Job<T extends Keyed> extends Keyed {
     assert resultingState != JobState.RUNNING;
     if( _state == JobState.CANCELLED ) Log.info("Canceled job " + _key + "("  + _description + ") was cancelled again.");
     if( _state == resultingState ) return; // No change if already done
-    _finalProgress = resultingState==JobState.DONE ? 1.0f : progress_impl(); // One-shot set from NaN to progress, no longer need Progress Key
+    final float finalProgress = resultingState==JobState.DONE ? 1.0f : progress_impl(); // One-shot set from NaN to progress, no longer need Progress Key
     final long done = System.currentTimeMillis();
     // Atomically flag the job as canceled
     new TAtomic<Job>() {
@@ -232,11 +237,12 @@ public class Job<T extends Keyed> extends Keyed {
         // Atomically capture changeJobState/crash state, plus end time
         old._exception = msg;
         old._state = resultingState;
+        System.err.println("changing Job state to : " + resultingState);
+        System.err.println(Thread.getAllStackTraces());
         old._end_time = done;
+        old._finalProgress = finalProgress;
         return old;
       }
-      // Run the onCancelled code synchronously, right now
-      @Override void onSuccess( Job old ) { if( isCancelledOrCrashed() ) onCancelled(); }
     }.invoke(_key);
     // Also immediately update immediately a possibly cached local POJO (might
     // be shared with the DKV cached job, might not).
@@ -244,20 +250,18 @@ public class Job<T extends Keyed> extends Keyed {
       _exception = msg;
       _state = resultingState;
       _end_time = done;
+      _finalProgress = finalProgress;
     }
     // Remove on cancel/fail/done, only used whilst Job is Running
-    DKV.remove(_progressKey);
-  }
-
-  /**
-   * Callback which is called after job cancellation (by user, by exception).
-   */
-  protected void onCancelled() {
+    if (deleteProgressKey())
+      DKV.remove(_progressKey);
   }
 
   /** Returns a float from 0 to 1 representing progress.  Polled periodically.
    *  Can default to returning e.g. 0 always.  */
-  public float progress() { return isStopped() ? _finalProgress : progress_impl(); }
+  public float progress() {
+    return isStopped() ? _finalProgress : progress_impl();
+  }
   // Read racy progress in a non-racy way: read the DKV exactly once,
   // null-checking as we go.  Handles the case where the Job is being removed
   // exactly when we are reading progress e.g. for the GUI.
@@ -279,7 +283,7 @@ public class Job<T extends Keyed> extends Keyed {
     return p==null ? "" : p.progress_msg();
   }
 
-  protected Key _progressKey; //Key to store the Progress object under
+  protected Key<Progress> _progressKey; //Key to store the Progress object under
   private float _finalProgress = Float.NaN; // Final progress after Job stops running
 
   /** Report new work done for this job */
@@ -291,7 +295,12 @@ public class Job<T extends Keyed> extends Keyed {
   /**
    * Helper class to store the job progress in the DKV
    */
-  public static class Progress extends Iced { // TODO: shouldn't this be a Keyed? And keys for it be Key<Progress> ?
+  public static class Progress extends Keyed<Progress> {
+    @Override
+    protected long checksum_impl() {
+      return 2134340823432L*_work + 9023742947234L*_worked+(long)(12343242340234L*_fraction_done)+_progress_msg.hashCode();
+    }
+
     // Progress methodology 1:  Specify total work up front and periodically tell when new units of work complete.
     private final long _work;
     private long _worked;
@@ -335,7 +344,7 @@ public class Job<T extends Keyed> extends Keyed {
   public static class JobCancelledException extends RuntimeException{}
 
   @Override protected Futures remove_impl(Futures fs) {
-    if (null != _progressKey) DKV.remove(_progressKey, fs);
+    if (null != _progressKey && deleteProgressKey()) DKV.remove(_progressKey, fs);
     return fs;
   }
 

@@ -37,15 +37,20 @@
 #' @param lambda_min_ratio Smallest value for lambda as a fraction of lambda.max. By default if the number of observations is greater than the
 #'                         the number of variables then \code{lambda_min_ratio} = 0.0001; if the number of observations is less than the number
 #'                         of variables then \code{lambda_min_ratio} = 0.01.
-#' @param use_all_factor_levels A logical value indicating whether dummy variables should be used for all factor levels of the categorical predictors.
-#'                              When \code{TRUE}, results in an over parameterized models.
 #' @param beta_constraints A data.frame or H2OParsedData object with the columns ["names",
 #'        "lower_bounds", "upper_bounds", "beta_given"], where each row corresponds to a predictor
 #'        in the GLM. "names" contains the predictor names, "lower"/"upper_bounds", are the lower
 #'        and upper bounds of beta, and "beta_given" is some supplied starting values for the
-#' @param nfolds (Currently Unimplemented)
+#' @param offset_column Specify the offset column.
+#' @param weights_column Specify the weights column.
+#' @param nfolds (Optional) Number of folds for cross-validation. If \code{nfolds >= 2}, then \code{validation} must remain empty.
+#' @param fold_column (Optional) Column with cross-validation fold index assignment per observation
+#' @param fold_assignment Cross-validation fold assignment scheme, if fold_column is not specified
+#'        Must be "Random" or "Modulo"
+#' @param keep_cross_validation_predictions Whether to keep the predictions of the cross-validation models
 #' @param ... (Currently Unimplemented)
 #'        coefficients.
+#' @param intercept Logical, include constant term (intercept) in the model
 #'
 #' @return A subclass of \code{\linkS4class{H2OModel}} is returned. The specific subclass depends on the machine learning task at hand
 #'         (if it's binomial classification, then an \code{\linkS4class{H2OBinomialModel}} is returned, if it's regression then a
@@ -54,7 +59,7 @@
 #'
 #'          Upon completion of the GLM, the resulting object has coefficients, normalized coefficients, residual/null deviance, aic,
 #'          and a host of model metrics including MSE, AUC (for logistic regression), degrees of freedom, and confusion matrices. Please
-#'          refer to the more in-depth GLM documentation available here: \url{http://docs2.h2o.ai/datascience/glm.html},
+#'          refer to the more in-depth GLM documentation available here: \url{http://h2o-release.s3.amazonaws.com/h2o-dev/rel-shannon/2/docs-website/h2o-docs/index.html#Data+Science+Algorithms-GLM},
 #'
 #' @seealso \code{\link{predict.H2OModel}} for prediction, \code{\link{h2o.mse}}, \code{\link{h2o.auc}},
 #'          \code{\link{h2o.confusionMatrix}}, \code{\link{h2o.performance}}, \code{\link{h2o.giniCoef}}, \code{\link{h2o.logloss}},
@@ -66,14 +71,12 @@
 #' prostatePath = system.file("extdata", "prostate.csv", package = "h2o")
 #' prostate.hex = h2o.importFile(localH2O, path = prostatePath, destination_frame = "prostate.hex")
 #' h2o.glm(y = "CAPSULE", x = c("AGE","RACE","PSA","DCAPS"), training_frame = prostate.hex,
-#'         family = "binomial", nfolds = 0, alpha = 0.5, lambda_search = FALSE,
-#'         use_all_factor_levels = FALSE)
+#'         family = "binomial", nfolds = 0, alpha = 0.5, lambda_search = FALSE)
 #'
 #' # Run GLM of VOL ~ CAPSULE + AGE + RACE + PSA + GLEASON
 #' myX = setdiff(colnames(prostate.hex), c("ID", "DPROS", "DCAPS", "VOL"))
 #' h2o.glm(y = "VOL", x = myX, training_frame = prostate.hex, family = "gaussian",
-#'         nfolds = 0, alpha = 0.1, lambda_search = FALSE,
-#'         use_all_factor_levels = FALSE)
+#'         nfolds = 0, alpha = 0.1, lambda_search = FALSE)
 #'
 #' \dontrun{
 #'  # GLM variable importance
@@ -86,7 +89,7 @@
 #'  myX = 1:20
 #'  myY="y"
 #'  my.glm = h2o.glm(x=myX, y=myY, training_frame=data.hex, family="binomial", standardize=TRUE,
-#'                  use_all_factor_levels=TRUE, lambda_search=TRUE)
+#'                  lambda_search=TRUE)
 #' }
 #' @export
 h2o.glm <- function(x, y, training_frame, model_id, validation_frame,
@@ -104,9 +107,14 @@ h2o.glm <- function(x, y, training_frame, model_id, validation_frame,
                     lambda_search = FALSE,
                     nlambdas = -1,
                     lambda_min_ratio = -1.0,
-                    use_all_factor_levels = FALSE,
-                    nfolds,
+                    nfolds = 0,
+                    fold_column = NULL,
+                    fold_assignment = c("Random","Modulo"),
+                    keep_cross_validation_predictions = FALSE,
                     beta_constraints = NULL,
+                    offset_column = NULL,
+                    weights_column = NULL,
+                    intercept = TRUE,
                     ...
                     )
 {
@@ -131,48 +139,39 @@ h2o.glm <- function(x, y, training_frame, model_id, validation_frame,
   parms <- list()
   parms$training_frame <- training_frame
   args <- .verify_dataxy(training_frame, x, y)
+  if( !missing(offset_column) )  args$x_ignore <- args$x_ignore[!( offset_column == args$x_ignore )]
+  if( !missing(weights_column) ) args$x_ignore <- args$x_ignore[!( weights_column == args$x_ignore )]
+  if( !missing(fold_column) ) args$x_ignore <- args$x_ignore[!( fold_column == args$x_ignore )]
   parms$ignored_columns <- args$x_ignore
   parms$response_column <- args$y
-  if(!missing(validation_frame))
-    parms$validation_frame <- validation_frame
-  if(!missing(model_id))
-    parms$model_id <- model_id
-  if(!missing(max_iterations))
-    parms$max_iterations <- max_iterations
-  if(!missing(beta_epsilon))
-    parms$beta_epsilon <- beta_epsilon
-  if(!missing(solver))
-    parms$solver <- solver
-  if(!missing(standardize))
-    parms$standardize <- standardize
-  if(!missing(family))
-    parms$family <- family
-  if(!missing(link))
-    parms$link <- link
-  if(!missing(tweedie_variance_power))
-    parms$tweedie_variance_power <- tweedie_variance_power
-  if(!missing(tweedie_link_power))
-    parms$tweedie_link_power <- tweedie_link_power
-  if(!missing(alpha))
-    parms$alpha <- alpha
-  if(!missing(prior))
-    parms$prior <- prior
-  if(!missing(lambda))
-    parms$lambda <- lambda
-  if(!missing(lambda_search))
-    parms$lambda_search <- lambda_search
-  if(!missing(nlambdas))
-    parms$nlambdas <- nlambdas
-  if(!missing(lambda_min_ratio))
-    parms$lambda_min_ratio <- lambda_min_ratio
-  if(!missing(use_all_factor_levels))
-    parms$use_all_factor_levels <- use_all_factor_levels
+  if( !missing(validation_frame) )          parms$validation_frame       <- validation_frame
+  if( !missing(model_id) )                  parms$model_id               <- model_id
+  if( !missing(max_iterations) )            parms$max_iterations         <- max_iterations
+  if( !missing(beta_epsilon) )              parms$beta_epsilon           <- beta_epsilon
+  if( !missing(solver) )                    parms$solver                 <- solver
+  if( !missing(standardize) )               parms$standardize            <- standardize
+  if( !missing(family) )                    parms$family                 <- family
+  if( !missing(link) )                      parms$link                   <- link
+  if( !missing(tweedie_variance_power) )    parms$tweedie_variance_power <- tweedie_variance_power
+  if( !missing(tweedie_link_power) )        parms$tweedie_link_power     <- tweedie_link_power
+  if( !missing(alpha) )                     parms$alpha                  <- alpha
+  if( !missing(prior) )                     parms$prior                  <- prior
+  if( !missing(lambda) )                    parms$lambda                 <- lambda
+  if( !missing(lambda_search) )             parms$lambda_search          <- lambda_search
+  if( !missing(nlambdas) )                  parms$nlambdas               <- nlambdas
+  if( !missing(lambda_min_ratio) )          parms$lambda_min_ratio       <- lambda_min_ratio
+  if( !missing(offset_column) )             parms$offset_column          <- offset_column
+  if( !missing(weights_column) )            parms$weights_column         <- weights_column
+  if( !missing(intercept) )                 parms$intercept              <- intercept
+  if( !missing(fold_column) )               parms$fold_column            <- fold_column
+  if( !missing(fold_assignment) )           parms$fold_assignment        <- fold_assignment
+  if( !missing(keep_cross_validation_predictions) )  parms$keep_cross_validation_predictions  <- keep_cross_validation_predictions
+
   # For now, accept nfolds in the R interface if it is 0 or 1, since those values really mean do nothing.
   # For any other value, error out.
   # Expunge nfolds from the message sent to H2O, since H2O doesn't understand it.
-  if(!missing(nfolds))
-    if (nfolds > 1) stop("nfolds >1 not supported")
-  #   parms$nfolds <- nfolds
+  if (!missing(nfolds) && nfolds > 1)
+    parms$nfolds <- nfolds
   if(!missing(beta_constraints)){
     delete <- !.is.eval(beta_constraints)
     if (delete) {
@@ -187,17 +186,15 @@ h2o.glm <- function(x, y, training_frame, model_id, validation_frame,
   m
 }
 
-#TODO Rename this function for clarity
-#' Remake an H2O GLM Model
+#' Set betas of an existing H2O GLM Model
 #'
-#' This function allows the usage of new beta constraints to create an GLM model, from an existing
-#' model.
+#' This function allows setting betas of an existing glm model.
 #' @param model an \linkS4class{H2OModel} corresponding from a \code{h2o.glm} call.
-#' @param beta a new set of beta_constraints
+#' @param beta a new set of betas (a named vector)
 #' @export
 h2o.makeGLMModel <- function(model,beta) {
    cat("beta =",beta,",",paste("[",paste(as.vector(beta),collapse=","),"]"))
-   res = .h2o.__remoteSend(model@conn, method="POST", .h2o.__GLMMakeModel, model_id=model@model_id, names = paste("[",paste(paste("\"",names(beta),"\"",sep=""), collapse=","),"]",sep=""), beta = paste("[",paste(as.vector(beta),collapse=","),"]",sep=""))
+   res = .h2o.__remoteSend(model@conn, method="POST", .h2o.__GLMMakeModel, model=model@model_id, names = paste("[",paste(paste("\"",names(beta),"\"",sep=""), collapse=","),"]",sep=""), beta = paste("[",paste(as.vector(beta),collapse=","),"]",sep=""))
    m <- h2o.getModel(model_id=res$model_id$name)
    m@model$coefficients <- m@model$coefficients_table[,2]
    names(m@model$coefficients) <- m@model$coefficients_table[,1]
@@ -209,7 +206,6 @@ h2o.makeGLMModel <- function(model,beta) {
 #' Creates a background H2O GLM job.
 #' @inheritParams h2o.glm
 #' @return Returns a \linkS4class{H2OModelFuture} class object.
-#' @seealso \code{\link{h2o.getGLMModel}} for resolving the \code{H2OModelFuture} object.
 #' @export
 h2o.startGLMJob <- function(x, y, training_frame, model_id, validation_frame,
                     #AUTOGENERATED Params
@@ -227,7 +223,6 @@ h2o.startGLMJob <- function(x, y, training_frame, model_id, validation_frame,
                     lambda_search = FALSE,
                     nlambdas = -1,
                     lambda_min_ratio = 1.0,
-                    use_all_factor_levels = FALSE,
                     nfolds = 0,
                     beta_constraints = NULL,
                     ...
@@ -285,26 +280,8 @@ h2o.startGLMJob <- function(x, y, training_frame, model_id, validation_frame,
       parms$nlambdas <- nlambdas
     if(!missing(lambda_min_ratio))
       parms$lambda_min_ratio <- lambda_min_ratio
-    if(!missing(use_all_factor_levels))
-      parms$use_all_factor_levels <- use_all_factor_levels
     if(!missing(nfolds))
       parms$nfolds <- nfolds
 
     .h2o.startModelJob(training_frame@conn, 'glm', parms)
-}
-
-# TODO: make this possible for all model types
-#' Resolve a GLM H2O Futures Model
-#'
-#' Turns an \linkS4class{H2OModelFuture} into a model of the correct type.
-#' @param keys an \linkS4class{H2OModelFuture} or correct job key.
-#' @param conn a corresponding \linkS4class{H2OConnection} class object.
-#' @return Returns the correct \linkS4class{H2OModel} for the created model.
-#' @export
-h2o.getGLMModel <- function(keys, conn) {
-  if(missing(conn)) conn <- h2o.getConnection()
-  job_key  <- keys[[1]]
-  dest_key <- keys[[1]]
-  .h2o.__waitOnJob(conn, job_key)
-  model <- h2o.getModel(dest_key, conn)
 }

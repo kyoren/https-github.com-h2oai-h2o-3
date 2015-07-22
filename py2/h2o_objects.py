@@ -193,9 +193,9 @@ class H2O(object):
         extraComment2 += extraComment if extraComment else ""
 
         if len(extraComment2) > 0:
-            log('Start ' + url + paramsStr, comment=extraComment2)
+            log('Start ' + cmd.upper() + " " + url + paramsStr, comment=extraComment2)
         else:
-            log('Start ' + url + paramsStr)
+            log('Start ' + cmd.upper() + " " + url + paramsStr)
 
         # file get passed thru kwargs here
         if h2o_args.no_timeout:
@@ -495,6 +495,8 @@ class H2O(object):
 
         if self.disable_h2o_log:
             args += ['-nolog']
+	
+	args += ['-ga_opt_out']
 
         # psutil psopen needs param/value in different arg elements
         # othetwise we'd need to pass as joined string, and run /bin/sh 

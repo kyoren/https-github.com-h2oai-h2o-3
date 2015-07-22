@@ -1,23 +1,28 @@
 package water;
 
-import static org.junit.Assert.*;
-
-import java.io.File;
-import java.lang.reflect.*;
-import java.util.ArrayList;
-import java.util.Arrays;
-import org.junit.*;
-import org.junit.rules.*;
-import org.junit.runners.model.Statement;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.Ignore;
+import org.junit.Rule;
+import org.junit.rules.TestRule;
 import org.junit.runner.Description;
+import org.junit.runners.model.Statement;
 import water.fvec.*;
 import water.parser.ParseDataset;
 import water.parser.ParseSetup;
-import water.util.FrameUtils;
+import water.parser.ValueString;
 import water.util.Log;
 import water.util.Timer;
-import water.parser.ValueString;
 import water.util.TwoDimTable;
+
+import java.io.File;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 @Ignore("Support for tests, but no actual tests here")
 public class TestUtil extends Iced {
@@ -235,7 +240,7 @@ public class TestUtil extends Iced {
     if (fr1 == fr2) return true;
     if( fr1.numCols() != fr2.numCols() ) return false;
     if( fr1.numRows() != fr2.numRows() ) return false;
-    if( fr1.checkCompatible(fr2) )
+    if( fr1.isCompatible(fr2) )
       return !(new Cmp1().doAll(new Frame(fr1).add(fr2))._unequal);
     // Else do it the slow hard way
     return !(new Cmp2(fr2).doAll(fr1)._unequal);
@@ -259,7 +264,8 @@ public class TestUtil extends Iced {
     boolean[] flipped = new boolean[ncomp];
 
     for(int j = 0; j < ncomp; j++) {
-      flipped[j] = Math.abs(expected[0][j] - actual[0][j]) > threshold;
+      // flipped[j] = Math.abs(expected[0][j] - actual[0][j]) > threshold;
+      flipped[j] = Math.abs(expected[0][j] - actual[0][j]) > Math.abs(expected[0][j] + actual[0][j]);
       for(int i = 0; i < nfeat; i++) {
         Assert.assertEquals(expected[i][j], flipped[j] ? -actual[i][j] : actual[i][j], threshold);
       }

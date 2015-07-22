@@ -1,7 +1,9 @@
 package hex.example;
 
-import hex.Model;
-import hex.SupervisedModelBuilder;
+import hex.ModelBuilder;
+import hex.ModelCategory;
+import hex.example.ExampleModel.ExampleOutput;
+import hex.example.ExampleModel.ExampleParameters;
 import hex.schemas.ExampleV3;
 import hex.schemas.ModelBuilderSchema;
 import water.H2O.H2OCountedCompleter;
@@ -15,11 +17,11 @@ import java.util.Arrays;
 /**
  *  Example model builder... building a trivial ExampleModel
  */
-public class Example extends SupervisedModelBuilder<ExampleModel,ExampleModel.ExampleParameters,ExampleModel.ExampleOutput> {
+public class Example extends ModelBuilder<ExampleModel,ExampleParameters,ExampleOutput> {
   @Override
-  public Model.ModelCategory[] can_build() {
-    return new Model.ModelCategory[]{
-            Model.ModelCategory.Unknown,
+  public ModelCategory[] can_build() {
+    return new ModelCategory[]{
+            ModelCategory.Unknown,
     };
   }
 
@@ -30,8 +32,13 @@ public class Example extends SupervisedModelBuilder<ExampleModel,ExampleModel.Ex
 
   public ModelBuilderSchema schema() { return new ExampleV3(); }
 
-  @Override public Example trainModel() {
-    return (Example)start(new ExampleDriver(), _parms._max_iterations);
+  @Override public Example trainModelImpl(long work) {
+    return (Example)start(new ExampleDriver(), work);
+  }
+
+  @Override
+  public long progressUnits() {
+    return _parms._max_iterations;
   }
 
   /** Initialize the ModelBuilder, validating all arguments and preparing the

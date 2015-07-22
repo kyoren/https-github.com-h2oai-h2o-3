@@ -5,6 +5,7 @@ import hex.ModelMetrics;
 import water.*;
 import water.exceptions.H2OIllegalArgumentException;
 import water.exceptions.H2OKeyNotFoundArgumentException;
+import water.exceptions.H2ONotFoundArgumentException;
 import water.fvec.Frame;
 import water.util.Log;
 
@@ -70,7 +71,7 @@ class ModelMetricsHandler extends Handler {
 
   /** Schema for a list of ModelMetricsBase.
    *  This should be common across all versions of ModelMetrics schemas, so it lives here.   */
-  public static final class ModelMetricsListSchemaV3 extends Schema<ModelMetricsList, ModelMetricsListSchemaV3> {
+  public static final class ModelMetricsListSchemaV3 extends RequestSchema<ModelMetricsList, ModelMetricsListSchemaV3> {
     // Input fields
     @API(help = "Key of Model of interest (optional)", json = true)
     public KeyV3.ModelKeyV3 model;
