@@ -160,8 +160,11 @@ public final class ParseDataset extends Job<Frame> {
     @Override public void onCompletion(CountedCompleter caller) {
       if (_job.isCancelledOrCrashed())
         parseCleanup();
-      else
+      else {
+        System.err.println("onCompletion calls done().");
+        System.err.println(Thread.getAllStackTraces());
         _job.done();
+      }
       _job._mfpt = null;
     }
 

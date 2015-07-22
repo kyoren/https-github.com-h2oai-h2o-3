@@ -64,6 +64,7 @@ public class JobsHandler extends Handler {
     } else {
       try {
         s.jobs[0] = (JobV3) Schema.schema(version, j).fillFromImpl(j);
+        System.err.println("Fetching job with status: " + s.jobs[0].status);
       }
       catch (H2ONotFoundArgumentException e) {
         // no special schema for this job subclass, so fall back to JobV3
