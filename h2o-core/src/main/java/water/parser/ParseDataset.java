@@ -162,7 +162,7 @@ public final class ParseDataset extends Job<Frame> {
         parseCleanup();
       else {
         System.err.println("onCompletion calls done().");
-        System.err.println(Thread.getAllStackTraces());
+        System.err.println(Arrays.toString(Thread.currentThread().getStackTrace()));
         _job.done();
       }
       _job._mfpt = null;

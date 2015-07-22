@@ -238,7 +238,7 @@ public class Job<T extends Keyed> extends Keyed {
         old._exception = msg;
         old._state = resultingState;
         System.err.println("changing Job state to : " + resultingState);
-        System.err.println(Thread.getAllStackTraces());
+        System.err.println(Arrays.toString(Thread.currentThread().getStackTrace()));
         old._end_time = done;
         old._finalProgress = finalProgress;
         return old;
