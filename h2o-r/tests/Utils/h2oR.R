@@ -199,6 +199,12 @@ function(testDesc, test) {
     conn@mutable$session_id <- .init.session_id(conn)
     assign("conn", conn, globalenv())
     tryCatch(test_that(testDesc, withWarnings(test(conn))), warning = function(w) WARN(w), error =function(e) FAIL(e))
+    h2o.logAndEcho(conn, "------------------------------------------------------------")
+    h2o.logAndEcho(conn, "")
+    h2o.logAndEcho(conn, paste("END OF TEST: ", R.utils::commandArgs(asValues=TRUE)$"f"))
+    h2o.logAndEcho(conn, "")
+    h2o.logAndEcho(conn, "------------------------------------------------------------")
+    h2o.removeAll(conn, timeout_secs=600)
     if (!PASSS) FAIL("Did not reach the end of test. Check Rsandbox/errors.log for warnings and errors.")
     PASS()
 }
