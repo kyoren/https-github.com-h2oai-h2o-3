@@ -15,14 +15,6 @@ public class RemoveAllHandler extends Handler {
       @Override public byte priority() { return H2O.GUI_PRIORITY; }
       @Override public void setupLocal() {  H2O.raw_clear(); }
     }.doAllNodes();
-    try{ Thread.currentThread().sleep(1000); } catch(InterruptedException ignore){}
-    new MRTask(){
-      @Override public byte priority() { return H2O.GUI_PRIORITY; }
-      @Override public void setupLocal() {
-        Log.info("KVS should be empty.  Here's what's in it:\n"+H2O.STOREtoString());
-      }
-    }.doAllNodes();
-
     Log.info("Finished removing objects");
     return u;
   }

@@ -151,13 +151,13 @@ public class AppendableVec extends Vec {
   public Vec close(Futures fs) {
     // Compute #chunks
     int nchunk = _tmp_espc.length;
-    System.out.println("NCHUNK: " + nchunk);
+//    System.out.println("NCHUNK: " + nchunk);
     DKV.remove(chunkKey(nchunk),fs); // remove potential trailing key
     while( nchunk > 1 && _tmp_espc[nchunk-1] == 0 ) {
       nchunk--;
       DKV.remove(chunkKey(nchunk),fs); // remove potential trailing key
     }
-    System.out.println("NCHUNK (after closing): " + nchunk);
+//    System.out.println("NCHUNK (after closing): " + nchunk);
     // Histogram chunk types
     int[] ctypes = new int[STRING+1];
     for( int i = 0; i < nchunk; ++i )

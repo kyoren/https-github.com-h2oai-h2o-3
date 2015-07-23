@@ -810,7 +810,10 @@ public final class ParseDataset extends Job<Frame> {
     // get all rollups started in parallell, otherwise this takes ages!
     Futures fs = new Futures();
     Vec[] vecArr = fr.vecs();
-    for(Vec v:vecArr)  v.startRollupStats(fs);
+    for(Vec v:vecArr)  {
+      Log.info("escpc length seen prior to rollup stats: "+v._espc.length);
+      v.startRollupStats(fs);
+    }
     fs.blockForPending();
 
     int namelen = 0;
