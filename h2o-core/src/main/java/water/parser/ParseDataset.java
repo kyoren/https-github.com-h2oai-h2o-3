@@ -123,7 +123,7 @@ public final class ParseDataset extends Job<Frame> {
 
   // Setup a private background parse job
   private ParseDataset(Key dest) {
-    super(dest,"Parse");
+    super(dest,"Parsing "+dest.toString());
   }
 
   // -------------------------------
