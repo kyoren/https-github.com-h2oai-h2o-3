@@ -3,8 +3,6 @@ package water.api;
 import water.*;
 import water.util.Log;
 
-import java.util.Set;
-
 public class RemoveAllHandler extends Handler {
   @SuppressWarnings("unused") // called through reflection by RequestServer
   public RemoveAllV3 remove(int version, RemoveAllV3 u) {
@@ -17,6 +15,14 @@ public class RemoveAllHandler extends Handler {
       @Override public byte priority() { return H2O.GUI_PRIORITY; }
       @Override public void setupLocal() {  H2O.raw_clear(); }
     }.doAllNodes();
+    try{ Thread.currentThread().sleep(1000); } catch(InterruptedException ignore){}
+    new MRTask(){
+      @Override public byte priority() { return H2O.GUI_PRIORITY; }
+      @Override public void setupLocal() {
+        Log.info("KVS should be empty.  Here's what's in it:\n"+H2O.STOREtoString());
+      }
+    }.doAllNodes();
+
     Log.info("Finished removing objects");
     return u;
   }
