@@ -35,3 +35,4 @@ task updateTestNGReport(type: Exec) {
 }
 
 test.finalizedBy(updateTestNGReport)
+
