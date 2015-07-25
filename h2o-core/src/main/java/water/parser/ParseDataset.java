@@ -184,6 +184,15 @@ public final class ParseDataset extends Job<Frame> {
       }
     }
   }
+  private static void reportSTORE() {
+    new MRTask(){
+      @Override public byte priority() { return H2O.GUI_PRIORITY; }
+      @Override public void setupLocal() {
+        if (!H2O.STOREtoString().isEmpty())
+          Log.info("KVS contents:\n"+H2O.STOREtoString());
+      }
+    }.doAllNodes();
+  }
 
   private static class EnumMapping extends Iced {
     final int [][] map;
@@ -206,14 +215,14 @@ public final class ParseDataset extends Job<Frame> {
       if (getByteVec(fkeys[i]).length() > 0)
         keyList.add(fkeys[i]);
     fkeys = keyList.toArray(new Key[keyList.size()]);
-
+    reportSTORE();
     job.update(0, "Ingesting files.");
     VectorGroup vg = getByteVec(fkeys[0]).group();
     MultiFileParseTask mfpt = job._mfpt = new MultiFileParseTask(vg,setup,job._key,fkeys,deleteOnDone);
     mfpt.doAll(fkeys);
     Log.trace("Done ingesting files.");
     if ( job.isCancelledOrCrashed()) return;
-
+    reportSTORE();
     final AppendableVec [] avs = mfpt.vecs();
     setup._column_names = getColumnNames(avs.length, setup._column_names);
 
@@ -299,7 +308,9 @@ public final class ParseDataset extends Job<Frame> {
 
     } else {                    // No enums case
       job.update(0,"Compressing data.");
+      reportSTORE();
       fr = new Frame(job.dest(), setup._column_names,AppendableVec.closeAll(avs));
+      reportSTORE();
       Log.trace("Done closing all Vecs.");
     }
     // Check for job cancellation
@@ -810,10 +821,7 @@ public final class ParseDataset extends Job<Frame> {
     // get all rollups started in parallell, otherwise this takes ages!
     Futures fs = new Futures();
     Vec[] vecArr = fr.vecs();
-    for(Vec v:vecArr)  {
-      Log.info("escpc length seen prior to rollup stats: "+v._espc.length);
-      v.startRollupStats(fs);
-    }
+    for(Vec v:vecArr) v.startRollupStats(fs);
     fs.blockForPending();
 
     int namelen = 0;
