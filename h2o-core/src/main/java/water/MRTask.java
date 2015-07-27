@@ -5,6 +5,7 @@ import jsr166y.ForkJoinPool;
 import water.fvec.*;
 import water.util.PrettyPrint;
 import water.fvec.Vec.VectorGroup;
+import water.util.Log;
 
 /**
  * Map/Reduce style distributed computation.
@@ -614,6 +615,21 @@ public abstract class MRTask<T extends MRTask<T>> extends DTask<T> implements Fo
       }
     } else if( _hi > _lo ) {    // Frame, Single chunk?
       Vec v0 = _fr.anyVec();
+      if (v0._espc.length == 736) {
+        Log.info("_escpc length is 736.");
+        Log.info("MR KVS contents:\n"+H2O.STOREtoString());
+        if (_run_local) {
+          Log.info("_run_local is TRUE");
+        }
+        if (v0.chunkKey(_lo).home()) {
+          Log.info("_lo is homed on this node");
+          Log.info("_lo is " + _lo);
+          Log.info("_hi is " + _hi);
+          Log.info("_lo chunkKey is "+v0.chunkKey(_lo));
+          Log.info("MR KVS contents:\n"+H2O.STOREtoString());
+        }
+      }
+
       if( _run_local || v0.chunkKey(_lo).home() ) { // And chunk is homed here?
 
         // Make decompression chunk headers for these chunks
