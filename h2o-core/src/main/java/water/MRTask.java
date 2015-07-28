@@ -615,7 +615,7 @@ public abstract class MRTask<T extends MRTask<T>> extends DTask<T> implements Fo
       }
     } else if( _hi > _lo ) {    // Frame, Single chunk?
       Vec v0 = _fr.anyVec();
-      if (v0._espc.length == 736) {
+      if (v0._espc != null && v0._espc.length == 736) {
         Log.info("_escpc length is 736.");
         Log.info("MR KVS contents:\n"+H2O.STOREtoString());
         if (_run_local) {
