@@ -615,20 +615,6 @@ public abstract class MRTask<T extends MRTask<T>> extends DTask<T> implements Fo
       }
     } else if( _hi > _lo ) {    // Frame, Single chunk?
       Vec v0 = _fr.anyVec();
-      if (v0._espc != null && v0._espc.length == 736) {
-        Log.info("_escpc length is 736.");
-        Log.info("MR KVS contents:\n"+H2O.STOREtoString());
-        if (_run_local) {
-          Log.info("_run_local is TRUE");
-        }
-        if (v0.chunkKey(_lo).home()) {
-          Log.info("_lo is homed on this node");
-          Log.info("_lo is " + _lo);
-          Log.info("_hi is " + _hi);
-          Log.info("_lo chunkKey is "+v0.chunkKey(_lo));
-          Log.info("MR KVS contents:\n"+H2O.STOREtoString());
-        }
-      }
 
       if( _run_local || v0.chunkKey(_lo).home() ) { // And chunk is homed here?
 
@@ -640,6 +626,20 @@ public abstract class MRTask<T extends MRTask<T>> extends DTask<T> implements Fo
           if( vecs[i] != null ) {
             assert _run_local || vecs[i].chunkKey(_lo).home()
               : "Chunk="+_lo+" v0="+v0+", k="+v0.chunkKey(_lo)+"   v["+i+"]="+vecs[i]+", k="+vecs[i].chunkKey(_lo);
+            if (vecs[i]._espc != null && vecs[i]._espc.length == 736) {
+              Log.info("_escpc length is 736.");
+              Log.info("MR KVS contents:\n"+H2O.STOREtoString());
+              if (_run_local) {
+                Log.info("_run_local is TRUE");
+              }
+              if (v0.chunkKey(_lo).home()) {
+                Log.info("_lo is homed on this node");
+                Log.info("_lo is " + _lo);
+                Log.info("_hi is " + _hi);
+                Log.info("_lo chunkKey is "+vecs[i].chunkKey(_lo));
+                Log.info("MR KVS contents:\n"+H2O.STOREtoString());
+              }
+            }
             bvs[i] = vecs[i].chunkForChunkIdx(_lo);
           }
         if(_noutputs > 0){
