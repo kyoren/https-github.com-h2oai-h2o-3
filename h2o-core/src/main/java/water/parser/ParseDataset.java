@@ -27,13 +27,13 @@ public final class ParseDataset extends Job<Frame> {
   private MultiFileParseTask _mfpt; // Access to partially built vectors for cleanup after parser crash
 
   // Keys are limited to ByteVec Keys and Frames-of-1-ByteVec Keys
-  public static Frame parse(Key okey, Key... keys) { return parse(okey,keys,true, false, ParseSetup.GUESS_HEADER); }
+  public static Frame parse(Key okey, Key... keys) { return parse(okey, keys, true, false, ParseSetup.GUESS_HEADER); }
 
   // Guess setup from inspecting the first Key only, then parse.
   // Suitable for e.g. testing setups, where the data is known to be sane.
   // NOT suitable for random user input!
   public static Frame parse(Key okey, Key[] keys, boolean deleteOnDone, boolean singleQuote, int checkHeader) {
-    return parse(okey,keys,deleteOnDone,ParseSetup.guessSetup(keys, singleQuote, checkHeader));
+    return parse(okey, keys, deleteOnDone, ParseSetup.guessSetup(keys, singleQuote, checkHeader));
   }
   public static Frame parse(Key okey, Key[] keys, boolean deleteOnDone, ParseSetup globalSetup) {
     return parse(okey,keys,deleteOnDone,globalSetup,true).get();
@@ -123,7 +123,7 @@ public final class ParseDataset extends Job<Frame> {
 
   // Setup a private background parse job
   private ParseDataset(Key dest) {
-    super(dest,"Parsing "+dest.toString());
+    super(dest, "Parsing " + dest.toString());
   }
 
   // -------------------------------
@@ -190,6 +190,14 @@ public final class ParseDataset extends Job<Frame> {
       @Override public void setupLocal() {
         if (!H2O.STOREtoString().isEmpty())
           Log.info("KVS contents:\n"+H2O.STOREtoString());
+        // $04ffd3000000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz
+        // $04ff65010000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz
+        final Vec vec = DKV.getGet("$04ff8e000000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz");
+        if (vec == null)
+          Log.info("Offending vec not found");
+        else {
+          Log.info("Found "+vec._key+ " and espc length is "+vec._espc);
+        }
       }
     }.doAllNodes();
   }
@@ -821,10 +829,8 @@ public final class ParseDataset extends Job<Frame> {
     // get all rollups started in parallell, otherwise this takes ages!
     Futures fs = new Futures();
     Vec[] vecArr = fr.vecs();
-    for(Vec v:vecArr) {
-      Log.info("logParseResults sees _espc of length "+ v._espc.length);
-      v.startRollupStats(fs);
-    }
+    Log.info("logParseResults sees _espc of length "+ fr.anyVec()._espc);
+    for(Vec v:vecArr) v.startRollupStats(fs);
     fs.blockForPending();
 
     int namelen = 0;
