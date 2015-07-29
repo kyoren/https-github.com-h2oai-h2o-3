@@ -367,7 +367,7 @@ class RollupStats extends Iced {
     protected void compute2() {
       assert _rsKey.home();
       final Vec vec = DKV.getGet(_vecKey);
-      if (vec._espc != null || vec._espc.length == 236)
+      if (vec._espc != null && vec._espc.length == 236)
         System.out.println("Compute 2 in rollup stats seeing _espc of length 236");
       while(true) {
         Value v = DKV.get(_rsKey);
