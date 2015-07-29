@@ -617,7 +617,7 @@ public abstract class MRTask<T extends MRTask<T>> extends DTask<T> implements Fo
       Vec v0 = _fr.anyVec();
 
       if( _run_local || v0.chunkKey(_lo).home() ) { // And chunk is homed here?
-        if(v0._espc != null && v0._espc.length == 236) Log.info("MRTask seeing espc length 236");
+        //if(v0._espc != null && v0._espc.length == 236) Log.info("MRTask seeing espc length 236");
         // Make decompression chunk headers for these chunks
         Vec vecs[] = _fr.vecs();
         Chunk bvs[] = new Chunk[vecs.length];
