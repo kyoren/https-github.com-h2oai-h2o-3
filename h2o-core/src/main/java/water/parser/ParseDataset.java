@@ -184,19 +184,21 @@ public final class ParseDataset extends Job<Frame> {
       }
     }
   }
-  private static void reportSTORE() {
+  private static void reportSTORE(String filenames, String stage) {
+    final String stage1 = stage;
+    final String s1 = filenames;
     new MRTask(){
       @Override public byte priority() { return H2O.GUI_PRIORITY; }
       @Override public void setupLocal() {
-        if (!H2O.STOREtoString().isEmpty())
-          Log.info("KVS contents:\n"+H2O.STOREtoString());
+        if (!H2O.STOREtoString().isEmpty()) {
+          Log.info(stage1+"\non files "+s1);
+          Log.info("KVS contents:\n" + H2O.STOREtoString());
+        }
         // $04ffd3000000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz
         // $04ff65010000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz
         final Vec vec = DKV.getGet("$04ff8e000000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz");
-        if (vec == null)
-          Log.info("Offending vec not found");
-        else {
-          Log.info("Found "+vec._key+ " and espc length is "+vec._espc);
+        if (vec != null) {
+          Log.info("Found " + vec._key + " and espc length is " + vec._espc.length);
         }
       }
     }.doAllNodes();
@@ -223,14 +225,14 @@ public final class ParseDataset extends Job<Frame> {
       if (getByteVec(fkeys[i]).length() > 0)
         keyList.add(fkeys[i]);
     fkeys = keyList.toArray(new Key[keyList.size()]);
-    reportSTORE();
+    reportSTORE(keyList.toString(), "About to ingest");
     job.update(0, "Ingesting files.");
     VectorGroup vg = getByteVec(fkeys[0]).group();
     MultiFileParseTask mfpt = job._mfpt = new MultiFileParseTask(vg,setup,job._key,fkeys,deleteOnDone);
     mfpt.doAll(fkeys);
     Log.trace("Done ingesting files.");
     if ( job.isCancelledOrCrashed()) return;
-    reportSTORE();
+    reportSTORE(keyList.toString(), "Done ingesting");
     final AppendableVec [] avs = mfpt.vecs();
     setup._column_names = getColumnNames(avs.length, setup._column_names);
 
@@ -316,9 +318,9 @@ public final class ParseDataset extends Job<Frame> {
 
     } else {                    // No enums case
       job.update(0,"Compressing data.");
-      reportSTORE();
+      reportSTORE(keyList.toString(), "About to finalize frame");
       fr = new Frame(job.dest(), setup._column_names,AppendableVec.closeAll(avs));
-      reportSTORE();
+      reportSTORE(keyList.toString(), "Frame finalized");
       Log.trace("Done closing all Vecs.");
     }
     // Check for job cancellation
