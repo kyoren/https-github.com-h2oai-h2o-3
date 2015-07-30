@@ -342,6 +342,12 @@ class RollupStats extends Iced {
     public ComputeRollupsTask(Vec v, boolean computeHisto){
       _priority = nextThrPriority();
       _vecKey = v._key;
+      if (_vecKey.toString().endsWith("test.csv.gz")) {
+        final Vec vec = DKV.getGet(_vecKey);
+        if (vec != null && vec._espc != null && vec._espc.length == 236)
+          System.out.println("MRTask sees _espc.length: "+vec._espc.length);
+      }
+
       _rsKey = v.rollupStatsKey();
       _computeHisto = computeHisto;
     }
