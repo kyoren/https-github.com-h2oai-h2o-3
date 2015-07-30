@@ -518,6 +518,13 @@ public abstract class MRTask<T extends MRTask<T>> extends DTask<T> implements Fo
    * chunks; call user's init.
    */
   private void setupLocal0() {
+    if (_fr != null ) {
+      final Vec vec = _fr.anyVec();
+      if (vec._key.toString().endsWith("test.csv.gz")) {
+        if (vec._espc != null && vec._espc.length == 236)
+          System.out.println("MRTask setupLocal0 sees _espc.length: " + vec._espc.length);
+      }
+    }
     assert _profile==null;
     _fs = new Futures();
     if(_doProfile) {
@@ -617,7 +624,6 @@ public abstract class MRTask<T extends MRTask<T>> extends DTask<T> implements Fo
       Vec v0 = _fr.anyVec();
 
       if( _run_local || v0.chunkKey(_lo).home() ) { // And chunk is homed here?
-        if(v0._key.toString().endsWith("test.csv.gz") && v0._espc != null && v0._espc.length == 236) System.out.println("MRTask seeing espc length 236");
         // Make decompression chunk headers for these chunks
         Vec vecs[] = _fr.vecs();
         Chunk bvs[] = new Chunk[vecs.length];

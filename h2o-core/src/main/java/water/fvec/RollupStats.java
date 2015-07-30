@@ -238,6 +238,13 @@ class RollupStats extends Iced {
     final Key _rskey;
     RollupStats _rs;
     Roll( H2OCountedCompleter cmp, Key rskey ) { super(cmp); _rskey=rskey; }
+    @Override public void setupLocal() {
+      final Vec vec = _fr.anyVec();
+      if (vec._key.toString().endsWith("test.csv.gz")) {
+        if (vec._espc != null && vec._espc.length == 236)
+          System.out.println("Roll setupLocal sees _espc.length: "+vec._espc.length);
+      }
+    }
     @Override public void map( Chunk c ) { _rs = new RollupStats(0).map(c); }
     @Override public void reduce( Roll roll ) { _rs.reduce(roll._rs); }
     @Override public void postGlobal() {
@@ -345,7 +352,7 @@ class RollupStats extends Iced {
       if (_vecKey.toString().endsWith("test.csv.gz")) {
         final Vec vec = DKV.getGet(_vecKey);
         if (vec != null && vec._espc != null && vec._espc.length == 236)
-          System.out.println("MRTask sees _espc.length: "+vec._espc.length);
+          System.out.println("CompRollupTasks constr sees _espc.length: "+vec._espc.length);
       }
 
       _rsKey = v.rollupStatsKey();
@@ -372,6 +379,11 @@ class RollupStats extends Iced {
     @Override
     protected void compute2() {
       assert _rsKey.home();
+      if (_vecKey.toString().endsWith("test.csv.gz")) {
+        final Vec vec = DKV.getGet(_vecKey);
+        if (vec != null && vec._espc != null && vec._espc.length == 236)
+          System.out.println("CompRollupTasks c2 sees _espc.length: "+vec._espc.length);
+      }
       final Vec vec = DKV.getGet(_vecKey);
       while(true) {
         Value v = DKV.get(_rsKey);
