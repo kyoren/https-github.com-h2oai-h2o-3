@@ -187,7 +187,7 @@ public final class ParseDataset extends Job<Frame> {
   private static void reportSTORE(String filenames, String stage) {
     final String stage1 = stage;
     final String s1 = filenames;
-    if (filenames.equals("[nfs://home/0xdiag/bigdata/laptop/mnist/test.csv.gz]")) {
+    if (filenames.endsWith("mnist/test.csv.gz]")) {
       new MRTask() {
         @Override
         public byte priority() {
