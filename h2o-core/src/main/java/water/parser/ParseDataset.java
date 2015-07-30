@@ -202,7 +202,7 @@ public final class ParseDataset extends Job<Frame> {
           }
           Vec[] vecs = H2O.getSTOREVecs();
           for (Vec v : vecs)
-            if (v._espc != null && v._espc.length > 2)
+            if (v != null && v._espc != null && v._espc.length > 2)
               Log.info("Wrong length: "+v._key);
 /*          Log.info("Found " + vec1._key + " and espc length is " + vec1._espc.length);
         final Vec vec2 = DKV.getGet("$04ff65010000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz");
