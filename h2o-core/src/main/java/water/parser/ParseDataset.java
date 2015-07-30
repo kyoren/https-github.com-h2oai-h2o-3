@@ -201,9 +201,16 @@ public final class ParseDataset extends Job<Frame> {
             Log.info("KVS contents:\n" + H2O.STOREtoString());
           }
           Vec[] vecs = H2O.getSTOREVecs();
-          for (Vec v : vecs)
-            if (v != null && v._key.toString().endsWith("test.csv.gz") && v._espc != null && v._espc.length > 2)
-              Log.info("Wrong length: "+v._espc.length+" : "+v._key);
+          int vecCnt = 0;
+          for (Vec v : vecs) {
+            if (v != null && v._key.toString().endsWith("test.csv.gz")) {
+              vecCnt++;
+              if (v._espc != null && v._espc.length > 2)
+                Log.info("Wrong length: " + v._espc.length + " : " + v._key);
+            }
+          }
+          if (vecCnt > 0)
+            Log.info(vecCnt + " test.csv.gz vecs seen");
 /*          Log.info("Found " + vec1._key + " and espc length is " + vec1._espc.length);
         final Vec vec2 = DKV.getGet("$04ff65010000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz");
         if (vec2 != null)
