@@ -1422,7 +1422,7 @@ final public class H2O {
   public static Vec[] getSTOREVecs() {
     int vecType = 0;
     for (int i = 0; i < TypeMap.CLAZZES.length; i++) {
-      if (TypeMap.CLAZZES[i].equals("water.fvec.Vec")) {
+      if (TypeMap.CLAZZES[i] != null && TypeMap.CLAZZES[i].equals("water.fvec.Vec")) {
         vecType = i;
         break;
       }
