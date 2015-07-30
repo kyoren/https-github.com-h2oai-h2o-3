@@ -353,6 +353,7 @@ class RollupStats extends Iced {
         final Vec vec = DKV.getGet(_vecKey);
         if (vec != null && vec._espc != null && vec._espc.length == 236)
           System.out.println("CompRollupTasks constr sees _espc.length: "+vec._espc.length);
+        else System.out.println("CompRollupTasks constr is fine.");
       }
 
       _rsKey = v.rollupStatsKey();
@@ -383,6 +384,7 @@ class RollupStats extends Iced {
         final Vec vec = DKV.getGet(_vecKey);
         if (vec != null && vec._espc != null && vec._espc.length == 236)
           System.out.println("CompRollupTasks c2 sees _espc.length: "+vec._espc.length);
+        else System.out.println("CompRollupTasks c2 is fine.");
       }
       final Vec vec = DKV.getGet(_vecKey);
       while(true) {
