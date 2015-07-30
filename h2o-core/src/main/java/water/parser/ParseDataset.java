@@ -187,20 +187,23 @@ public final class ParseDataset extends Job<Frame> {
   private static void reportSTORE(String filenames, String stage) {
     final String stage1 = stage;
     final String s1 = filenames;
-    new MRTask(){
-      @Override public byte priority() { return H2O.GUI_PRIORITY; }
-      @Override public void setupLocal() {
-        if (!H2O.STOREtoString().isEmpty()) {
-          Log.info(stage1+"\non files "+s1);
-          Log.info("KVS contents:\n" + H2O.STOREtoString());
+    if (filenames.equals("[nfs://home/0xdiag/bigdata/laptop/mnist/test.csv.gz]")) {
+      new MRTask() {
+        @Override
+        public byte priority() {
+          return H2O.GUI_PRIORITY;
         }
-        final Vec vec1 = DKV.getGet("$04ffd3000000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz");
-        if (vec1 != null) {
+
+        @Override
+        public void setupLocal() {
+          if (!H2O.STOREtoString().isEmpty()) {
+            Log.info(stage1 + " on files " + s1);
+            Log.info("KVS contents:\n" + H2O.STOREtoString());
+          }
           Vec[] vecs = H2O.getSTOREVecs();
           for (Vec v : vecs)
-            if (v._espc != null && v._espc.length == 236)
-              Log.info(v._key);
-        }
+            if (v._espc != null && v._espc.length > 2)
+              Log.info("Wrong length: "+v._key);
 /*          Log.info("Found " + vec1._key + " and espc length is " + vec1._espc.length);
         final Vec vec2 = DKV.getGet("$04ff65010000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz");
         if (vec2 != null)
@@ -208,8 +211,9 @@ public final class ParseDataset extends Job<Frame> {
         final Vec vec3 = DKV.getGet("$04ff8e000000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz");
         if (vec3 != null)
           Log.info("Found " + vec3._key + " and espc length is " + vec3._espc.length); */
-      }
-    }.doAllNodes();
+        }
+      }.doAllNodes();
+    }
   }
 
   private static class EnumMapping extends Iced {
@@ -839,7 +843,7 @@ public final class ParseDataset extends Job<Frame> {
     // get all rollups started in parallell, otherwise this takes ages!
     Futures fs = new Futures();
     Vec[] vecArr = fr.vecs();
-    Log.info("logParseResults sees _espc of length "+ fr.anyVec()._espc);
+    Log.info("logParseResults sees _espc of length "+ fr.anyVec()._espc.length);
     for(Vec v:vecArr) v.startRollupStats(fs);
     fs.blockForPending();
 
