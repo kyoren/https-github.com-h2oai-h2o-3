@@ -195,14 +195,19 @@ public final class ParseDataset extends Job<Frame> {
           Log.info("KVS contents:\n" + H2O.STOREtoString());
         }
         final Vec vec1 = DKV.getGet("$04ffd3000000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz");
-        if (vec1 != null)
-          Log.info("Found " + vec1._key + " and espc length is " + vec1._espc.length);
+        if (vec1 != null) {
+          Vec[] vecs = H2O.getSTOREVecs();
+          for (Vec v : vecs)
+            if (v._espc != null && v._espc.length == 236)
+              Log.info(v._key);
+        }
+/*          Log.info("Found " + vec1._key + " and espc length is " + vec1._espc.length);
         final Vec vec2 = DKV.getGet("$04ff65010000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz");
         if (vec2 != null)
           Log.info("Found " + vec2._key + " and espc length is " + vec2._espc.length);
         final Vec vec3 = DKV.getGet("$04ff8e000000ffffffff$nfs://home2/0xdiag/bigdata/laptop/mnist/test.csv.gz");
         if (vec3 != null)
-          Log.info("Found " + vec3._key + " and espc length is " + vec3._espc.length);
+          Log.info("Found " + vec3._key + " and espc length is " + vec3._espc.length); */
       }
     }.doAllNodes();
   }

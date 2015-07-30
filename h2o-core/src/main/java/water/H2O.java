@@ -19,6 +19,7 @@ import water.util.Log;
 import water.util.PrettyPrint;
 import water.util.OSUtils;
 
+import water.fvec.Vec;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -1417,6 +1418,29 @@ final public class H2O {
       if( cnts[t] != 0 )
         sb.append(String.format("-%30s %5d\n",TypeMap.CLAZZES[t],cnts[t]));
     return sb.toString();
+  }
+  public static Vec[] getSTOREVecs() {
+    int vecType = 0;
+    for (int i = 0; i < TypeMap.CLAZZES.length; i++) {
+      if (TypeMap.CLAZZES[i].equals("water.fvec.Vec")) {
+        vecType = i;
+        break;
+      }
+    }
+
+    Object[] kvs = H2O.STORE.raw_array();
+    Vec[] vecs = new Vec[(kvs.length-2)/2];
+    int j =0;
+    // Start the walk at slot 2, because slots 0,1 hold meta-data
+    for( int i=2; i<kvs.length; i += 2 ) {
+      // In the raw backing array, Keys and Values alternate in slots
+      Object ov = kvs[i+1];
+      if( !(ov instanceof Value) ) continue; // Ignore tombstones and Primes and null's
+      Value val = (Value)ov;
+      if ( val.type() == vecType )
+        vecs[j++] = val.get();
+    }
+    return vecs;
   }
 
   // Persistence manager
