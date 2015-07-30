@@ -332,7 +332,7 @@ public final class ParseDataset extends Job<Frame> {
       job.update(0,"Compressing data.");
       reportSTORE(keyList.toString(), "About to finalize frame");
       fr = new Frame(job.dest(), setup._column_names,AppendableVec.closeAll(avs));
-      reportSTORE(keyList.toString(), "Frame finalized");
+      //reportSTORE(keyList.toString(), "Frame finalized");
       Log.trace("Done closing all Vecs.");
     }
     // Check for job cancellation
@@ -347,6 +347,7 @@ public final class ParseDataset extends Job<Frame> {
       for( String err : mfpt._errors )
         Log.warn(err);
     job.update(0,"Calculating data summary.");
+    reportSTORE(keyList.toString(), "Frame finalized");
     logParseResults(job, fr);
     // Release the frame for overwriting
     fr.update(job._key);
