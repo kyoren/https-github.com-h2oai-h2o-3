@@ -424,6 +424,11 @@ class RollupStats extends Iced {
           fs.blockForPending();
           if(oldv == v){ // got the lock, compute the rollups
             addToPendingCount(1);
+            if (_vecKey.toString().endsWith("test.csv.gz")) {
+        if (vec != null && vec._espc != null && vec._espc.length == 236)
+          System.out.println("CompRollupTasks c2 sees _espc.length: "+vec._espc.length);
+        else System.out.println("CompRollupTasks c2 is fine.");
+      }
             new Roll(new H2OCallback<Roll>(this) {
               @Override
               public void callback(Roll rs) {
