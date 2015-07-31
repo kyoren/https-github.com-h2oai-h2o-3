@@ -83,7 +83,7 @@ check.looping_slice_quantile <- function(conn) {
 
   set.seed(556677)
   df = df.gen()
-  df = as.h2o(conn, df, key = "orig.hex")
+  df = as.h2o(conn, df, destination_frame = "orig.hex")
 
 
   #----------------------------------------------------------------------
