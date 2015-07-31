@@ -19,7 +19,7 @@ public class TaskGetKey extends DTask<TaskGetKey> {
   // Unify multiple Key/Value fetches for the same Key from the same Node at
   // the "same time".  Large key fetches are slow, and we'll get multiple
   // requests close in time.  Batch them up.
-  private static final NonBlockingHashMap<Key,RPC<TaskGetKey>> TGKS = new NonBlockingHashMap();
+  public static final NonBlockingHashMap<Key,RPC<TaskGetKey>> TGKS = new NonBlockingHashMap();
 
   // Get a value from a named remote node
   static Value get( H2ONode target, Key key ) { return get(start(target,key)); }

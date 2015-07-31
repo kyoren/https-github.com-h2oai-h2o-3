@@ -9,6 +9,8 @@ import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicLongFieldUpdater;
 import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
+import water.TaskGetKey;
+
 /*
  * Written by Cliff Click and released to the public domain, as explained at
  * http://creativecommons.org/licenses/publicdomain
@@ -386,6 +388,7 @@ public class NonBlockingHashMap<TypeK, TypeV>
     Object[] newkvs = new NonBlockingHashMap(MIN_SIZE)._kvs;
     while( !CAS_kvs(_kvs,newkvs) ) // Spin until the clear works
       ;
+    System.out.println(TaskGetKey.TGKS.toString());
   }
 
   /** Returns <tt>true</tt> if this Map maps one or more keys to the specified

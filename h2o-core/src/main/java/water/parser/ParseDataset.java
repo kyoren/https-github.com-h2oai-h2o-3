@@ -199,6 +199,7 @@ public final class ParseDataset extends Job<Frame> {
           if (!H2O.STOREtoString().isEmpty()) {
             Log.info(stage1 + " on files " + s1);
             Log.info("KVS contents:\n" + H2O.STOREtoString());
+            System.out.println(TaskGetKey.TGKS.toString());
           }
           Vec[] vecs = H2O.getSTOREVecs();
           int vecCnt = 0, nullEspc = 0, escp2 =0;
