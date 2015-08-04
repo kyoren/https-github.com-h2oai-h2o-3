@@ -2,11 +2,71 @@
 
 ##H2O
 
-###Simons (3.0.1.4) - 7/29/15
+###Simons (3.0.1.5) - 8/3/15
 
 ####New Features
 
 The following changes represent features that have been added since the previous release:
+
+#####Web UI
+
+- [HEXDEV-390](https://0xdata.atlassian.net/browse/HEXDEV-390): Print Flow to PDF / Printer
+
+
+####Enhancements
+
+The following changes are improvements to existing features (which includes changed default values):
+
+
+#####Algorithms
+
+- [GitHub](https://github.com/h2oai/h2o-3/commit/a15490b3507265e2768698ca768c98b6eb40d85b): add seed to the model building that uses balance_classes, for determinism/repeatability 
+- [GitHub](https://github.com/h2oai/h2o-3/commit/fa4118960f5ab97f391ff86b077482ee2575c6a4): Reduce the frequency at which tiny tree models are printed to stdout: Only print during the first 4 seconds if `score_each_iteration` is enabled.
+- [GitHub](https://github.com/h2oai/h2o-3/commit/610e3fb8c3df087c9f21b19a33e97d53f0829e6e): Only call the limited printout for TwoDimTables during Model.toString () that prints all TwoDimTables of the model._output.
+- [GitHub](https://github.com/h2oai/h2o-3/commit/0898eff8d2c7a01f29a23754eab2b0d954480faf): Only print up to 10 rows of TwoDimTables in ASCII logs (first/last 5).
+- [GitHub](https://github.com/h2oai/h2o-3/commit/77e62aa916c11f57aa66cec12ccb707d946f76a3): Remove some overflow/underflow checks: Let exp(x) be small and log(x) be large.
+
+#####API
+
+- [GitHub](https://github.com/h2oai/h2o-3/commit/a01fde0c855e9194a1fead2f39587d958f915438): Cleanup of public API of Schema.java. Improve its JavaDoc a lot.
+
+
+#####Python
+
+- [PUBDEV-1765](https://0xdata.atlassian.net/browse/PUBDEV-1765): Improve python online documentation
+
+#####R
+
+- [PUBDEV-1744](https://0xdata.atlassian.net/browse/PUBDEV-1744): Improve help message of h2o.init function
+
+#####System
+
+- [GitHub](https://github.com/h2oai/h2o-3/commit/887be2cdcfef7b8e954950447b295d14c7e30b04):  Add -JJ command line argument to allow extra JVM arguments to be passed.
+
+
+####Bug Fixes 
+
+The following changes are to resolve incorrect software behavior:
+
+
+#####Algorithms
+
+- [PUBDEV-1674](https://0xdata.atlassian.net/browse/PUBDEV-1674): gbm w gamma: does not seems to split at all; all  trees node pred=0 for attached data [GitHub](https://github.com/h2oai/h2o-3/commit/5796d9e9725bcee27278a31e42c7b77089e65710)
+- [PUBDEV-1760](https://0xdata.atlassian.net/browse/PUBDEV-1760): GBM : Deviance testing for exp family
+- [PUBDEV-1714](https://0xdata.atlassian.net/browse/PUBDEV-1714): gbm gamma: R vs h2o same split variable, slightly different leaf predictions
+- [PUBDEV-1755](https://0xdata.atlassian.net/browse/PUBDEV-1755): DL : Math correctness for Tweedie with Offsets/Weights
+- [PUBDEV-1758](https://0xdata.atlassian.net/browse/PUBDEV-1758): DL : Deviance testing for exp family
+
+#####Python
+
+- [PUBDEV-1779](https://0xdata.atlassian.net/browse/PUBDEV-1779): Fixes intermittent failure seen when Model Metrics were looked at too quickly after a cross validation run.
+
+
+---
+
+###Simons (3.0.1.4) - 7/29/15
+
+####New Features
 
 #####Algorithms
 - [HEXDEV-220](https://0xdata.atlassian.net/browse/HEXDEV-220): Tweedie distribution for DL
@@ -14,7 +74,10 @@ The following changes represent features that have been added since the previous
 - [HEXDEV-221](https://0xdata.atlassian.net/browse/HEXDEV-221): Gamma distribution for DL
 - [PUBDEV-683](https://0xdata.atlassian.net/browse/PUBDEV-683): Enable nfolds for all algos (where reasonable) [GitHub](https://github.com/h2oai/h2o-3/commit/68d74cb438dd535acac18ce8233fdaa25882b6c5)
 - [PUBDEV-1791](https://0xdata.atlassian.net/browse/PUBDEV-1791): Add toString() for all models (especially model metrics) [GitHub](https://github.com/h2oai/h2o-3/commit/c253f5ff73b1828de026f69f6846e1b85087b056)
-- [GitHub](https://github.com/h2oai/h2o-3/commit/792a0789ef951bf0997251a05cb3dd8d5d92af9e): Enabling model checkpointing for DRF & GBM
+- [GitHub](https://github.com/h2oai/h2o-3/commit/792a0789ef951bf0997251a05cb3dd8d5d92af9e): Enabling model checkpointing for DRF
+- [GitHub](https://github.com/h2oai/h2o-3/commit/29b12729465cc4e0c71597616a748ad12ab1a099): Enable checkpointing for GBM.
+- [PUBDEV-1698](https://0xdata.atlassian.net/browse/PUBDEV-1698): fold assignment in N-fold cross-validation 
+
 
 ##### Python
 - [PUBDEV-386](https://0xdata.atlassian.net/browse/PUBDEV-386): Expose ParseSetup to user in Python
@@ -169,12 +232,12 @@ The following changes are to resolve incorrect software behavior:
 
 #####Algorithms
 
-- PUBDEV-1743: gbm poisson w weights: deviance off 
-- PUBDEV-1736: gbm poisson with offset: seems to be giving wrong leaf predictions
+- [PUBDEV-1743](https://0xdata.atlassian.net/browse/PUBDEV-1743): gbm poisson w weights: deviance off 
+- [PUBDEV-1736](https://0xdata.atlassian.net/browse/PUBDEV-1736): gbm poisson with offset: seems to be giving wrong leaf predictions
 
 #####Python
 
-- [PUBDEV-1731](https://0xdata.atlassian.net/browse/PUBDEV-1731): Python get_frame() results in deleting a frame created by Flow
+- [PUBDEV-1731](https://0xdata.atlassian.net/browse/PUBDEV-1731): Python `get_frame()` results in deleting a frame created by Flow
 - [HEXDEV-389](https://0xdata.atlassian.net/browse/HEXDEV-389): Split frame from python 
 - [HEXDEV-388](https://0xdata.atlassian.net/browse/HEXDEV-388): python client H2OFrame constructor puts the header into the data (as the first row)
 
