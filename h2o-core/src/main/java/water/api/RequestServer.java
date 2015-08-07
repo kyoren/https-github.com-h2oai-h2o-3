@@ -91,11 +91,14 @@ public class RequestServer extends NanoHTTPD {
   static {
     // Data
 
+    // TODO: ImportFiles should be a POST!
+
     addToNavbar(register("/3/CreateFrame","POST",CreateFrameHandler.class,"run"        ,"Create a synthetic H2O Frame."),"/CreateFrame", "Create Frame",  "Data");
     addToNavbar(register("/3/SplitFrame" ,"POST",SplitFrameHandler.class,"run"         ,"Split a H2O Frame."),"/SplitFrame",  "Split Frame",   "Data");
     addToNavbar(register("/3/Interaction","POST",InteractionHandler.class,"run"        ,"Create interactions between categorical columns."),"/Interaction", "Categorical Interactions",  "Data");
     addToNavbar(register("/3/MissingInserter" ,"POST",MissingInserterHandler.class,"run","Insert missing values."),"/MissingInserter",  "Insert Missing Values",   "Data");
     addToNavbar(register("/3/ImportFiles","GET",ImportFilesHandler.class,"importFiles" ,"Import raw data files into a single-column H2O Frame."), "/ImportFiles", "Import Files",  "Data");
+    addToNavbar(register("/3/ImportFiles","POST",ImportFilesHandler.class,"importFiles" ,"Import raw data files into a single-column H2O Frame."), "/ImportFiles", "Import Files",  "Data");
     addToNavbar(register("/3/ParseSetup" ,"POST",ParseSetupHandler.class,"guessSetup"  ,"Guess the parameters for parsing raw byte-oriented data into an H2O Frame."),"/ParseSetup","ParseSetup",    "Data");
     addToNavbar(register("/3/Parse"      ,"POST",ParseHandler     .class,"parse"       ,"Parse a raw byte-oriented Frame into a useful columnar data Frame."),"/Parse"      , "Parse",         "Data"); // NOTE: prefer POST due to higher content limits
 
@@ -145,8 +148,12 @@ public class RequestServer extends NanoHTTPD {
 
     register("/3/Find"                                             ,"GET"   ,FindHandler.class,    "find",
       "Find a value within a Frame.");
-    register("/3/Frames/(?<frameid>.*)/export/(?<path>.*)/overwrite/(?<force>.*)" ,"POST", FramesHandler.class, "export",                  new String[] {"frame_id", "path", "force"},
+
+    // TODO: add a DEPRECATED flag, and make this next one DEPRECATED
+    register("/3/Frames/(?<frameid>.*)/export/(?<path>.*)/overwrite/(?<force>.*)" ,"GET", FramesHandler.class, "export",                  new String[] {"frame_id", "path", "force"},
             "Export a Frame to the given path with optional overwrite.");
+    register("/3/Frames/(?<frameid>.*)/export" ,"POST", FramesHandler.class, "export",                  new String[] {"frame_id"},
+        "Export a Frame to the given path with optional overwrite.");
     register("/3/Frames/(?<frameid>.*)/columns/(?<column>.*)/summary","GET"   ,FramesHandler.class, "columnSummary", "columnSummaryDocs", new String[] {"frame_id", "column"},
       "Return the summary metrics for a column, e.g. mins, maxes, mean, sigma, percentiles, etc.");
     register("/3/Frames/(?<frameid>.*)/columns/(?<column>.*)/domain" ,"GET"   ,FramesHandler.class, "columnDomain",                       new String[] {"frame_id", "column"},
@@ -181,6 +188,13 @@ public class RequestServer extends NanoHTTPD {
             "Import given binary model into H2O.");
     register("/99/Models.bin/(?<modelid>.*)"                        ,"GET"   ,ModelsHandler.class, "exportModel",                            new String[] {"model_id"},
             "Export given model.");
+
+    register("/99/Grids/(?<gridid>.*)"                              ,"GET"   ,GridsHandler.class, "fetch",                                  new String[] {"grid_id"},
+            "Return the specified grid search result.");
+
+    register("/99/Grids"                                            ,"GET"   ,GridsHandler.class, "list",
+            "Return all grids from H2O distributed K/V store.");
+
 
     register("/3/Configuration/ModelBuilders/visibility"         ,"POST"  ,ModelBuildersHandler.class, "setVisibility",
       "Set Model Builders visibility level.");
@@ -693,7 +707,8 @@ public class RequestServer extends NanoHTTPD {
       }
       ModelSchema ms = (ModelSchema)mb.models[0];
       Response r = new Response(http_response_header, MIME_DEFAULT_BINARY, ms.toJava(mb.preview));
-      //r.addHeader("Content-Disposition", "attachment; filename=\"" + ms.model_id.key().toString() + ".java\"");
+      // Needed to make file name match class name
+      r.addHeader("Content-Disposition", "attachment; filename=\"" + JCodeGen.toJavaId(ms.model_id.key().toString()) + ".java\"");
       return r;
     case html: {
       RString html = new RString(_htmlTemplate);

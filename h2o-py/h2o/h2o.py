@@ -20,6 +20,9 @@ from model import H2OBinomialModel,H2OAutoEncoderModel,H2OClusteringModel,H2OMul
 import h2o_model_builder
 
 
+__PROGRESS_BAR__ = True  # display & update progress bar while polling
+
+
 def import_file(path):
   """
   Import a single file or collection of files.
@@ -368,7 +371,8 @@ def run_test(sys_args, test_to_run):
   log_and_echo("------------------------------------------------------------")
   num_keys = store_size()
   try:
-    test_to_run(ip, port)
+    if len(sys_args) > 3 and sys_args[3] == "--ipynb": ipy_notebook_exec(sys_args[4],save_and_norun=False)
+    else: test_to_run(ip, port)
   finally:
     remove_all()
     if keys_leaked(num_keys): print "Leaked Keys!"
@@ -381,6 +385,14 @@ def ou():
   """
   from inspect import stack
   return stack()[2][1]
+
+def no_progress():
+  global __PROGRESS_BAR__
+  __PROGRESS_BAR__=False
+
+def do_progress():
+  global __PROGRESS_BAR__
+  __PROGRESS_BAR__=True
 
 def log_and_echo(message):
   """
@@ -655,7 +667,7 @@ def export_file(frame,path,force=False):
   :param force: Overwrite any preexisting file with the same path
   :return: None
   """
-  H2OJob(H2OConnection.post_json("Frames/"+frame._id+"/export/"+path+"/overwrite/"+("true" if force else "false")), "Export File").poll()
+  H2OJob(H2OConnection.get_json("Frames/"+frame._id+"/export/"+path+"/overwrite/"+("true" if force else "false")), "Export File").poll()
 
 
 def cluster_info():
