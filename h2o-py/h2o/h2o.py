@@ -1,9 +1,7 @@
-"""
-This module provides all of the top level calls for models and various data transform methods.
-By simply
-"""
-
+import warnings
+warnings.simplefilter('always', DeprecationWarning)
 import os
+import functools
 import os.path
 import re
 import urllib
@@ -23,21 +21,21 @@ import h2o_model_builder
 __PROGRESS_BAR__ = True  # display & update progress bar while polling
 
 
-def import_file(path):
+def lazy_import(path):
   """
   Import a single file or collection of files.
 
   :param path: A path to a data file (remote or local).
   :return: A new H2OFrame
   """
-  paths = [path] if isinstance(path,str) else path
-  return [ _import1(fname) for fname in paths ]
+  if isinstance(path,(list,tuple)): return [_import(p)[0] for p in path]
+  elif os.path.isdir(path):         return _import(path)
+  else:                             return [_import(path)[0]]
 
-def _import1(path):
+def _import(path):
   j = H2OConnection.get_json(url_suffix="ImportFiles", path=path)
-  if j['fails']:
-    raise ValueError("ImportFiles of " + path + " failed on " + j['fails'])
-  return j['destination_frames'][0]
+  if j['fails']: raise ValueError("ImportFiles of " + path + " failed on " + str(j['fails']))
+  return j['destination_frames']
 
 def upload_file(path, destination_frame=""):
   """
@@ -53,7 +51,7 @@ def upload_file(path, destination_frame=""):
   return H2OFrame(raw_id=destination_frame)
 
 
-def import_frame(path=None):
+def import_file(path=None):
   """
   Import a frame from a file (remote or local machine). If you run H2O on Hadoop, you can access to HDFS
 
@@ -61,7 +59,6 @@ def import_frame(path=None):
   :return: A new H2OFrame
   """
   return H2OFrame(file_path=path)
-
 
 def parse_setup(raw_frames):
   """
@@ -125,7 +122,7 @@ def parse(setup, h2o_name, first_line_is_header=(-1, 0, 1)):
 
 def parse_raw(setup, id=None, first_line_is_header=(-1,0,1)):
   """
-  Used in conjunction with import_file and parse_setup in order to make alterations before parsing.
+  Used in conjunction with lazy_import and parse_setup in order to make alterations before parsing.
 
   :param setup: Result of h2o.parse_setup
   :param id: An optional id for the frame.
@@ -797,7 +794,7 @@ def deeplearning(x,y=None,validation_x=None,validation_y=None,training_frame=Non
   :param keep_cross_validation_predictions: Whether to keep the predictions of the cross-validation models
   :return: Return a new classifier or regression model.
   """
-  parms = {k:v for k,v in locals().items() if k in ["training_frame", "validation_frame", "validation_x", "validation_y", "offset_column", "weights_column", "fold_column"] or v is not None}
+  parms = {k:v for k,v in locals().items() if k in ["y","training_frame", "validation_frame", "validation_x", "validation_y", "offset_column", "weights_column", "fold_column"] or v is not None}
   parms["algo"]="deeplearning"
   return h2o_model_builder.supervised(parms)
 
@@ -886,7 +883,7 @@ def gbm(x,y,validation_x=None,validation_y=None,training_frame=None,model_id=Non
         learn_rate=None,nbins=None,nbins_cats=None,validation_frame=None,
         balance_classes=None,max_after_balance_size=None,seed=None,build_tree_one_node=None,
         nfolds=None,fold_column=None,fold_assignment=None,keep_cross_validation_predictions=None,
-        score_each_iteration=None,offset_column=None,weights_column=None,do_future=None):
+        score_each_iteration=None,offset_column=None,weights_column=None,do_future=None,checkpoint=None):
   """
   Builds gradient boosted classification trees, and gradient boosted regression trees on a parsed data set.
   The default distribution function will guess the model type based on the response column typerun properly the
@@ -928,7 +925,7 @@ def glm(x,y,validation_x=None,validation_y=None,training_frame=None,model_id=Non
         tweedie_variance_power=None,tweedie_link_power=None,alpha=None,prior=None,lambda_search=None,
         nlambdas=None,lambda_min_ratio=None,beta_constraints=None,offset_column=None,weights_column=None,
         nfolds=None,fold_column=None,fold_assignment=None,keep_cross_validation_predictions=None,
-        intercept=None, Lambda=None, do_future=None):
+        intercept=None, Lambda=None, do_future=None, checkpoint=None):
   """
   Build a Generalized Linear Model
   Fit a generalized linear model, specified by a response variable, a set of predictors, and a description of the error
@@ -1001,7 +998,7 @@ def start_glm_job(x,y,validation_x=None,validation_y=None,**kwargs):
 def kmeans(x,validation_x=None,k=None,model_id=None,max_iterations=None,standardize=None,init=None,seed=None,
            nfolds=None,fold_column=None,fold_assignment=None,training_frame=None,validation_frame=None,
            user_points=None,ignored_columns=None,score_each_iteration=None,keep_cross_validation_predictions=None,
-           ignore_const_cols=None):
+           ignore_const_cols=None,checkpoint=None):
   """
   Performs k-means clustering on an H2O dataset.
 
@@ -1032,7 +1029,7 @@ def random_forest(x,y,validation_x=None,validation_y=None,training_frame=None,mo
                   build_tree_one_node=None,ntrees=None,max_depth=None,min_rows=None,nbins=None,nbins_cats=None,
                   binomial_double_trees=None,validation_frame=None,balance_classes=None,max_after_balance_size=None,
                   seed=None,offset_column=None,weights_column=None,nfolds=None,fold_column=None,fold_assignment=None,
-                  keep_cross_validation_predictions=None):
+                  keep_cross_validation_predictions=None,checkpoint=None):
   """
   Build a Big Data Random Forest Model
   Builds a Random Forest Model on an H2OFrame
@@ -1123,7 +1120,7 @@ def svd(x,validation_x=None,nv=None,max_iterations=None,transform=None,seed=None
 def naive_bayes(x,y,validation_x=None,validation_y=None,training_frame=None,validation_frame=None,
                 laplace=None,threshold=None,eps=None,compute_metrics=None,offset_column=None,weights_column=None,
                 balance_classes=None,max_after_balance_size=None, nfolds=None,fold_column=None,fold_assignment=None,
-                keep_cross_validation_predictions=None):
+                keep_cross_validation_predictions=None,checkpoint=None):
   """
   The naive Bayes classifier assumes independence between predictor variables conditional on the response, and a
   Gaussian distribution of numeric predictors with mean and standard deviation computed from the training dataset.
@@ -1398,3 +1395,30 @@ def can_use_pandas():
     return True
   except ImportError:
     return False
+
+
+#  ALL DEPRECATED METHODS BELOW #
+
+def h2o_deprecated(newfun=None):
+  def o(fun):
+    if newfun is not None: m = "{} is deprecated. Use {}.".format(fun.__name__,newfun.__name__)
+    else:                  m = "{} is deprecated.".format(fun.__name__)
+    @functools.wraps(fun)
+    def i(*args, **kwargs):
+      print
+      print
+      warnings.warn(m, category=DeprecationWarning, stacklevel=2)
+      return fun(*args, **kwargs)
+    return i
+  return o
+
+@h2o_deprecated(import_file)
+def import_frame(path=None):
+  """
+  Deprecated for import_file.
+
+  :param path: A path specifiying the location of the data to import.
+  :return: A new H2OFrame
+  """
+  warnings.warn("deprecated: Use import_file", DeprecationWarning)
+  return import_file(path)
