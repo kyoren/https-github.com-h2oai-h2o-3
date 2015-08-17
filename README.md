@@ -143,6 +143,15 @@ Syncing smalldata is not required after each pull, but if tests fail due to miss
     pip install tabulate
     pip install wheel
 
+Python tests require:
+
+    pip install sklearn
+    pip install numpy
+    pip install scipy
+    pip install pandas
+    pip install statsmodles
+    pip install patsy
+
 ### 4.3. Setup on Windows
 
 ##### Step 1: Download and install [WinPython](https://winpython.github.io). 
@@ -377,7 +386,8 @@ For users of Eclipse, generate project files with:
 
 Pre-built H2O-on-Hadoop zip files are available on the [download page](http://h2o.ai/download).  Each Hadoop distribution version has a separate zip file in h2o-3.
 
-To build H2O with Hadoop support yourself, enter the following from the top-level h2o-3 directory:
+To build H2O with Hadoop support yourself, first install sphinx for python: `pip install sphinx`
+Then start the build by entering  the following from the top-level h2o-3 directory:
 
     (export BUILD_HADOOP=1; ./gradlew build -x test)
     ./gradlew dist

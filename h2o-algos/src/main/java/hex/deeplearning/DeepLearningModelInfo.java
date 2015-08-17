@@ -160,20 +160,22 @@ public class DeepLearningModelInfo extends Iced {
    * Main constructor
    * @param params Model parameters
    * @param dinfo Data Info
-   * @param classification Whether we do classification or not
+   * @param nClasses number of classes (1 for regression, 0 for autoencoder)
    * @param train User-given training data frame, prepared by AdaptTestTrain
    * @param valid User-specified validation data frame, prepared by AdaptTestTrain
    */
-  public DeepLearningModelInfo(final DeepLearningParameters params, final DataInfo dinfo, boolean classification, Frame train, Frame valid) {
-    _classification = classification;
+  public DeepLearningModelInfo(final DeepLearningParameters params, final DataInfo dinfo, int nClasses, Frame train, Frame valid) {
+    _classification = nClasses > 1;
     _train = train;
     _valid = valid;
     data_info = dinfo;
     parameters = (DeepLearningParameters) params.clone(); //make a copy, don't change model's parameters
-    DeepLearningParameters.Sanity.modifyParms(parameters, parameters, _classification); //sanitize the model_info's parameters
+    DeepLearningParameters.Sanity.modifyParms(parameters, parameters, nClasses); //sanitize the model_info's parameters
 
     final int num_input = dinfo.fullN();
     final int num_output = get_params()._autoencoder ? num_input : (_classification ? train.lastVec().cardinality() : 1);
+    if (!get_params()._autoencoder) assert(num_output == nClasses);
+
     _saw_missing_cats = dinfo._cats > 0 ? new boolean[data_info._cats] : null;
     assert (num_input > 0);
     assert (num_output > 0);
@@ -312,9 +314,10 @@ public class DeepLearningModelInfo extends Iced {
             (!get_params()._autoencoder ? ("predicting " + _train.lastVecName() + ", ") : "") +
                     (get_params()._autoencoder ? "auto-encoder" :
                             _classification ? (units[units.length - 1] + "-class classification") : "regression")
-                    + ", " + get_params()._loss.toString() + " loss, "
+                    + ", " + get_params()._distribution + " distribution, " + get_params()._loss + " loss, "
                     + String.format("%,d", size()) + " weights/biases, " + PrettyPrint.bytes(byte_size) + ", "
-                    + String.format("%,d", get_processed_global()) + " training samples",
+                    + String.format("%,d", get_processed_global()) + " training samples, "
+                    + "mini-batch size " + String.format("%,d", get_params()._mini_batch_size),
             new String[neurons.length],
             new String[]{"Layer", "Units", "Type", "Dropout", "L1", "L2",
                     "Mean Rate", "Rate RMS", "Momentum",
@@ -715,4 +718,16 @@ public class DeepLearningModelInfo extends Iced {
     return Key.make(get_params()._model_id + ".elasticaverage", (byte) 1 /*replica factor*/, (byte) 31 /*hidden user-key*/, true, H2O.CLOUD._memary[0]);
   }
 
+  static public class GradientCheck {
+    GradientCheck(int l, int r, int c) { layer=l; row=r; col=c; }
+    int layer;
+    int row;
+    int col;
+    float gradient;
+    void apply(int l, int r, int c, float g) {
+      if (r==row && c==col && l==layer)
+        gradient=g;
+    }
+  }
+  static public GradientCheck gradientCheck = null;
 }
