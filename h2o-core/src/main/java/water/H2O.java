@@ -45,6 +45,7 @@ final public class H2O {
   // Command-line argument parsing and help
   //-------------------------------------------------------------------------------------------------------------------
 
+
   /**
    * Print help about command line arguments.
    */
@@ -148,7 +149,8 @@ final public class H2O {
   /**
    * A class containing all of the arguments for H2O.
    */
-  public static class OptArgs {
+  public static class
+    OptArgs {
     //-----------------------------------------------------------------------------------
     // Help and info
     //-----------------------------------------------------------------------------------
@@ -238,6 +240,7 @@ final public class H2O {
 
     /** -beta, -experimental */
     public ModelBuilder.BuilderVisibility model_builders_visibility = ModelBuilder.BuilderVisibility.Stable;
+    public boolean useUDP = false;
 
     @Override public String toString() {
       StringBuilder result = new StringBuilder();
@@ -431,8 +434,9 @@ final public class H2O {
       }
       else if (s.matches("experimental")) {
         ARGS.model_builders_visibility = ModelBuilder.BuilderVisibility.Experimental;
-      }
-      else {
+      } else if(s.matches("useUDP")) {
+          ARGS.useUDP = true;
+      } else {
         parseFailed("Unknown argument (" + s + ")");
       }
     }
@@ -607,8 +611,10 @@ final public class H2O {
    *
    * Use reflection to find all classes that inherit from water.api.AbstractRegister
    * and call the register() method for each.
+   *
+   * @param relativeResourcePath Relative path from running process working dir to find web resources.
    */
-  public static void registerRestApis() {
+  public static void registerRestApis(String relativeResourcePath) {
     if (apisRegistered) {
       throw H2O.fail("APIs already registered");
     }
@@ -633,7 +639,7 @@ final public class H2O {
             Log.debug("Found REST API registration for class: " + registerClass.getName());
             Object instance = registerClass.newInstance();
             water.api.AbstractRegister r = (water.api.AbstractRegister) instance;
-            r.register();
+            r.register(relativeResourcePath);
           }
           catch (Exception e) {
             throw H2O.fail(e.toString());
@@ -1244,7 +1250,7 @@ final public class H2O {
 
     // Start the TCPReceiverThread, to listen for TCP requests from other Cloud
     // Nodes. There should be only 1 of these, and it never shuts down.
-    new TCPReceiverThread().start();
+    new TCPReceiverThread(NetworkInit._tcpSocketBig).start();
     // Register the default Requests
     Object x = water.api.RequestServer.class;
   }
@@ -1264,6 +1270,10 @@ final public class H2O {
   static public void registerPOST( String url_pattern, Class hclass, String hmeth, String summary ) {
     if( _doneRequests ) throw new IllegalArgumentException("Cannot add more Requests once the list is finalized");
     RequestServer.register(url_pattern,"POST",hclass,hmeth,null,summary);
+  }
+
+  public static void registerResourceRoot(File f) {
+    JarHash.registerResourceRoot(f);
   }
 
   /** Start the web service; disallow future URL registration.
