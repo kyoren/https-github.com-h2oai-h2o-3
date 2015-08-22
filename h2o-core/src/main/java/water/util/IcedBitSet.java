@@ -120,6 +120,22 @@ public class IcedBitSet extends Iced {
     }
     return sb.p("}");
   }
+
+  public SBOutputStream toString(SBOutputStream sb) {
+    sb.p("{");
+    if( _bitoff>0 ) sb.p("...").p(_bitoff).p(" 0-bits... ");
+
+    int bytes = bytes(_nbits);
+    for(int i = 0; i < bytes; i++) {
+      if( i>0 && _bitoff + 8*i < size()) sb.p(' ');
+      for( int j=0; j<8; j++ ) {
+        if (_bitoff + 8*i + j >= size()) break;
+        sb.p((_val[_byteoff + i] >> j) & 1);
+      }
+    }
+    return sb.p("}");
+  }
+  
   public String toStrArray() {
     StringBuilder sb = new StringBuilder();
     sb.append("{").append(_val[_byteoff]);

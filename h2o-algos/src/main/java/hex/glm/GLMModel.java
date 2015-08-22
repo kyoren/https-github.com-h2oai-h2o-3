@@ -723,7 +723,7 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     return preds;
   }
 
-  @Override protected void toJavaPredictBody(SB body, SB classCtx, SB file) {
+  @Override protected void toJavaPredictBody(SBuild body, SBuild classCtx, SBuild file) {
     final int nclass = _output.nclasses();
     String mname = JCodeGen.toJavaId(_key.toString());
     JCodeGen.toStaticVar(classCtx,"BETA",beta(),"The Coefficients");
@@ -762,7 +762,7 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     }
   }
 
-  @Override protected SB toJavaInit(SB sb, SB fileContext) {
+  @Override protected SBuild toJavaInit(SBuild sb, SBuild fileContext) {
     sb.nl();
     sb.ip("public boolean isSupervised() { return true; }").nl();
     sb.ip("public int nfeatures() { return "+_output.nfeatures()+"; }").nl();
