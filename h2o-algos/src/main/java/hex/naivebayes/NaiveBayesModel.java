@@ -8,7 +8,6 @@ import water.Key;
 import water.api.ModelSchema;
 import water.util.JCodeGen;
 import water.util.SB;
-import water.util.SBuild;
 import water.util.TwoDimTable;
 
 public class NaiveBayesModel extends Model<NaiveBayesModel,NaiveBayesModel.NaiveBayesParameters,NaiveBayesModel.NaiveBayesOutput> {
@@ -106,7 +105,7 @@ public class NaiveBayesModel extends Model<NaiveBayesModel,NaiveBayesModel.Naive
     return preds;
   }
 
-  @Override protected SBuild toJavaInit(SBuild sb, SBuild fileContextSB) {
+  @Override protected SB toJavaInit(SB sb, SB fileContextSB) {
     sb = super.toJavaInit(sb, fileContextSB);
     sb.ip("public boolean isSupervised() { return " + isSupervised() + "; }").nl();
     sb.ip("public int nfeatures() { return " + _output.nfeatures() + "; }").nl();
@@ -126,7 +125,7 @@ public class NaiveBayesModel extends Model<NaiveBayesModel,NaiveBayesModel.Naive
     return sb;
   }
 
-  @Override protected void toJavaPredictBody( final SBuild bodySb, final SBuild classCtxSb, final SBuild fileCtxSb) {
+  @Override protected void toJavaPredictBody( final SB bodySb, final SB classCtxSb, final SB fileCtxSb) {
     SB model = new SB();
     bodySb.i().p("java.util.Arrays.fill(preds,0);").nl();
     bodySb.i().p("double mean, sdev, prob;").nl();

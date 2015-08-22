@@ -1044,7 +1044,7 @@ public class DeepLearningModel extends Model<DeepLearningModel,DeepLearningParam
     return sb.toString();
   }
 
-  @Override protected SBuild toJavaInit(SBuild sb, SBuild fileContextSB) {
+  @Override protected SB toJavaInit(SB sb, SB fileContextSB) {
     sb = super.toJavaInit(sb, fileContextSB);
     String mname = JCodeGen.toJavaId(_key.toString());
 
@@ -1146,7 +1146,7 @@ public class DeepLearningModel extends Model<DeepLearningModel,DeepLearningParam
 
   @Override protected boolean toJavaCheckTooBig() { return (model_info.size() > 1e6); }
 
-  @Override protected void toJavaPredictBody( final SBuild bodySb, final SBuild classCtxSb, final SBuild fileCtxSb) {
+  @Override protected void toJavaPredictBody( final SB bodySb, final SB classCtxSb, final SB fileCtxSb) {
     SB model = new SB();
     final DeepLearningParameters p = model_info.get_params();
     bodySb.i().p("java.util.Arrays.fill(preds,0);").nl();

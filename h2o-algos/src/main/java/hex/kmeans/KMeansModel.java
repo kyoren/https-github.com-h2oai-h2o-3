@@ -9,7 +9,7 @@ import water.MRTask;
 import water.fvec.Chunk;
 import water.fvec.Frame;
 import water.util.JCodeGen;
-import water.util.SBuild;
+import water.util.SB;
 import water.util.TwoDimTable;
 
 public class KMeansModel extends ClusteringModel<KMeansModel,KMeansModel.KMeansParameters,KMeansModel.KMeansOutput> {
@@ -122,7 +122,7 @@ public class KMeansModel extends ClusteringModel<KMeansModel,KMeansModel.KMeansP
   }
 
   // Override in subclasses to provide some top-level model-specific goodness
-  @Override protected void toJavaPredictBody(SBuild bodySb, SBuild classCtxSb, SBuild fileCtxSb) {
+  @Override protected void toJavaPredictBody(SB bodySb, SB classCtxSb, SB fileCtxSb) {
     // fileCtxSb.ip("").nl(); // at file level
     // Two class statics to support prediction
     if(_parms._standardize) {

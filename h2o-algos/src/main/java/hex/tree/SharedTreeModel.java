@@ -198,14 +198,14 @@ public abstract class SharedTreeModel<M extends SharedTreeModel<M,P,O>, P extend
     return _output==null || _output._treeStats._num_trees * _output._treeStats._mean_leaves > 1000000;
   }
   protected boolean binomialOpt() { return true; }
-  @Override protected SBuild toJavaInit(SBuild sb, SBuild fileContext) {
+  @Override protected SB toJavaInit(SB sb, SB fileContext) {
     sb.nl();
     sb.ip("public boolean isSupervised() { return true; }").nl();
     sb.ip("public int nfeatures() { return "+_output.nfeatures()+"; }").nl();
     sb.ip("public int nclasses() { return "+_output.nclasses()+"; }").nl();
     return sb;
   }
-  @Override protected void toJavaPredictBody(SBuild body, SBuild classCtx, SBuild file) {
+  @Override protected void toJavaPredictBody(SB body, SB classCtx, SB file) {
     final int nclass = _output.nclasses();
     body.ip("java.util.Arrays.fill(preds,0);").nl();
     body.ip("double[] fdata = hex.genmodel.GenModel.SharedTree_clean(data);").nl();
@@ -235,9 +235,9 @@ public abstract class SharedTreeModel<M extends SharedTreeModel<M,P,O>, P extend
     }
     toJavaUnifyPreds(body,file);
   }
-  abstract protected void toJavaUnifyPreds( SBuild body, SBuild file );
-  protected SBuild toJavaTreeName( final SBuild sb, String mname, int t, int c ) { return sb.p(mname).p("_Tree_").p(t).p("_class_").p(c); }
-  protected SBuild toJavaForestName( final SBuild sb, String mname, int t ) { return sb.p(mname).p("_Forest_").p(t); }
+  abstract protected void toJavaUnifyPreds( SB body, SB file );
+  protected SB toJavaTreeName( final SB sb, String mname, int t, int c ) { return sb.p(mname).p("_Tree_").p(t).p("_class_").p(c); }
+  protected SB toJavaForestName( final SB sb, String mname, int t ) { return sb.p(mname).p("_Forest_").p(t); }
 
   @Override
   public List<Key> getPublishedKeys() {

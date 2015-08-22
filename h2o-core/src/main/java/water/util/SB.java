@@ -1,12 +1,15 @@
 package water.util;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import water.H2O;
 
 /** Tight/tiny StringBuilder wrapper.
  *  Short short names on purpose; so they don't obscure the printing.
  *  Can't believe this wasn't done long long ago. */
-public final class SB extends SBuild {
+public final class SB {
   public final StringBuilder _sb;
+  private int _indent = 0;
   public SB(        ) { _sb = new StringBuilder( ); }
   public SB(String s) { _sb = new StringBuilder(s); }
   public SB ps( String s ) { _sb.append("\""); pj(s); _sb.append("\""); return this;  }
@@ -66,7 +69,7 @@ public final class SB extends SBuild {
   // Decrease indentation
   public SB di( int i) { _indent -= i; return this; }
   // Copy indent from given string buffer
-  public SB ci( SBuild sb) { _indent = sb._indent; return this; }
+  public SB ci( SB sb) { _indent = sb._indent; return this; }
   public SB nl( ) { return p('\n'); }
   // Convert a String[] into a valid Java String initializer
   public SB toJavaStringInit( String[] ss ) {
@@ -124,4 +127,20 @@ public final class SB extends SBuild {
   // Mostly a fail, since we should just dump into the same SB.
   public SB p( SB sb ) { _sb.append(sb._sb); return this;  }
   @Override public String toString() { return _sb.toString(); }
+
+  /** Java-string illegal characters which need to be escaped */
+  public static final Pattern[] ILLEGAL_CHARACTERS = new Pattern[] { Pattern.compile("\\",Pattern.LITERAL), Pattern.compile("\"",Pattern.LITERAL) };
+  public static final String[]  REPLACEMENTS       = new String [] { "\\\\\\\\", "\\\\\"" };
+
+  /** Escape all " and \ characters to provide a proper Java-like string
+   * Does not escape unicode characters.
+   */
+  public static String escapeJava(String s) {
+    assert ILLEGAL_CHARACTERS.length == REPLACEMENTS.length;
+    for (int i=0; i<ILLEGAL_CHARACTERS.length; i++ ) {
+      Matcher m = ILLEGAL_CHARACTERS[i].matcher(s);
+      s = m.replaceAll(REPLACEMENTS[i]);
+    }
+    return s;
+  }
 }

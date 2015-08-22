@@ -7,7 +7,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import java.io.ByteArrayOutputStream;
 
 import hex.genmodel.GenModel;
 import water.DKV;
@@ -31,8 +30,6 @@ import water.util.JCodeGen;
 import water.util.Log;
 import water.util.MathUtils;
 import water.util.SB;
-import water.util.SBOutputStream;
-import water.util.SBuild;
 import water.util.TwoDimTable;
 
 import static hex.ModelMetricsMultinomial.getHitRatioTable;
@@ -887,9 +884,8 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
    *    }
    *  </pre>
    */
-
-  public final String toJava(boolean preview) { return ((ByteArrayOutputStream) toJava(new SBOutputStream(), preview).getOutputStream()).toString(); }
-  public SBOutputStream toJava( SBOutputStream sb, boolean preview ) {
+  public final String toJava(boolean preview) { return toJava(new SB(), preview).toString(); }
+  public SB toJava( SB sb, boolean preview ) {
     SB fileContext = new SB();  // preserve file context
     String modelName = JCodeGen.toJavaId(_key.toString());
     // HEADER
@@ -943,8 +939,8 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
     sb.p("}").nl().di(1);
     sb.p(fileContext).nl(); // Append file
     if (preview) {
-      String [] first100k = sb.toString().substring(0, Math.min(sb.toString().length(), 100000)).split("\n");
-      SBOutputStream out = new SBOutputStream();
+      String [] first100k = sb._sb.toString().substring(0, Math.min(sb._sb.toString().length(), 100000)).split("\n");
+      SB out = new SB();
       int lines=0;
       for (String line : first100k) {
         out.p(line).nl();
@@ -955,10 +951,10 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
     return sb;
   }
   /** Generate implementation for super class. */
-  protected SBuild toJavaSuper( String modelName, SBuild sb ) {
+  protected SB toJavaSuper( String modelName, SB sb ) {
     return sb.nl().ip("public " + modelName + "() { super(NAMES,DOMAINS); }").nl();
   }
-  private SBuild toJavaNAMES(SBuild sb, SBuild fileContextSB) {
+  private SB toJavaNAMES(SB sb, SB fileContextSB) {
     String modelName = JCodeGen.toJavaId(_key.toString());
     String namesHolderClassName = "NamesHolder_"+modelName;
     sb.i().p("// ").p("Names of columns used by model.").nl();
@@ -968,11 +964,11 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
     JCodeGen.toClassWithArray(fileContextSB, null, namesHolderClassName, Arrays.copyOf(_output._names, _output.nfeatures()));
     return sb;
   }
-  protected SBuild toJavaNCLASSES( SBuild sb ) {
+  protected SB toJavaNCLASSES( SB sb ) {
     return _output.isClassifier() ? JCodeGen.toStaticVar(sb, "NCLASSES", _output.nclasses(), "Number of output classes included in training data response column.") : sb;
   }
 
-  private SBuild toJavaDOMAINS( SBuild sb, SBuild fileContext ) {
+  private SB toJavaDOMAINS( SB sb, SB fileContext ) {
     String modelName = JCodeGen.toJavaId(_key.toString());
     sb.nl();
     sb.ip("// Column domains. The last array contains domain of response column.").nl();
@@ -993,7 +989,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
     }
     return sb.ip("};").nl();
   }
-  protected SBuild toJavaPROB( SBuild sb) {
+  protected SB toJavaPROB( SB sb) {
     if(isSupervised()) {
       JCodeGen.toStaticVar(sb, "PRIOR_CLASS_DISTRIB", _output._priorClassDist, "Prior class distribution");
       JCodeGen.toStaticVar(sb, "MODEL_CLASS_DISTRIB", _output._modelClassDist, "Class distribution used for model building");
@@ -1005,15 +1001,15 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
     return true;
   }
   // Override in subclasses to provide some top-level model-specific goodness
-  protected SBuild toJavaInit(SBuild sb, SBuild fileContext) { return sb; }
+  protected SB toJavaInit(SB sb, SB fileContext) { return sb; }
   // Override in subclasses to provide some inside 'predict' call goodness
   // Method returns code which should be appended into generated top level class after
   // predict method.
-  protected void toJavaPredictBody(SBuild body, SBuild cls, SBuild file) {
+  protected void toJavaPredictBody(SB body, SB cls, SB file) {
     throw new IllegalArgumentException("This model type does not support conversion to Java");
   }
   // Wrapper around the main predict call, including the signature and return value
-  private SBuild toJavaPredict(SBuild ccsb, SBuild file) { // ccsb = classContext
+  private SB toJavaPredict(SB ccsb, SB file) { // ccsb = classContext
     ccsb.nl();
     ccsb.ip("// Pass in data in a double[], pre-aligned to the Model's requirements.").nl();
     ccsb.ip("// Jam predictions into the preds[] array; preds[0] is reserved for the").nl();

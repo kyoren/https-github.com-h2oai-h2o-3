@@ -3,7 +3,6 @@ package hex.tree;
 import java.util.Arrays;
 import water.H2O;
 import water.util.SB;
-import water.util.SBuild;
 import water.util.IcedBitSet;
 
 class TreeJCodeGen extends TreeVisitor<RuntimeException> {
@@ -20,23 +19,23 @@ class TreeJCodeGen extends TreeVisitor<RuntimeException> {
   int _subtrees = 0;
   int _grpcnt = 0;
 
-  public TreeJCodeGen(SharedTreeModel tm, CompressedTree ct, SBuild sb) {
+  public TreeJCodeGen(SharedTreeModel tm, CompressedTree ct, SB sb) {
     super(ct);
     _tm = tm;
-    _sb = (SB) sb;
+    _sb = sb;
     _csb = new SB();
     _grpsplit = new SB();
   }
 
   // code preamble
-  protected void preamble(SBuild sb, int subtree) throws RuntimeException {
+  protected void preamble(SB sb, int subtree) throws RuntimeException {
     String subt = subtree>0?String.valueOf(subtree):"";
     sb.ip("static final double score0").p(subt).p("(double[] data) {").nl().ii(1); // predict method for one tree
     sb.ip("double pred = ");
   }
 
   // close the code
-  protected void closure(SBuild sb) throws RuntimeException {
+  protected void closure(SB sb) throws RuntimeException {
     sb.p(";").nl();
     sb.ip("return pred;").nl().di(1);
     sb.ip("}").nl();

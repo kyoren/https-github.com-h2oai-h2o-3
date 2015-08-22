@@ -7,7 +7,6 @@ import water.MRTask;
 import water.fvec.Chunk;
 import water.fvec.Frame;
 import water.util.JCodeGen;
-import water.util.SBuild;
 import water.util.SB;
 
 public class SVDModel extends Model<SVDModel,SVDModel.SVDParameters,SVDModel.SVDOutput> {
@@ -139,7 +138,7 @@ public class SVDModel extends Model<SVDModel,SVDModel.SVDParameters,SVDModel.SVD
     return preds;
   }
 
-  @Override protected SBuild toJavaInit(SBuild sb, SBuild fileContextSB) {
+  @Override protected SB toJavaInit(SB sb, SB fileContextSB) {
     sb = super.toJavaInit(sb, fileContextSB);
     sb.ip("public boolean isSupervised() { return " + isSupervised() + "; }").nl();
     sb.ip("public int nfeatures() { return "+_output.nfeatures()+"; }").nl();
@@ -155,7 +154,7 @@ public class SVDModel extends Model<SVDModel,SVDModel.SVDParameters,SVDModel.SVD
     return sb;
   }
 
-  @Override protected void toJavaPredictBody( final SBuild bodySb, final SBuild classCtxSb, final SBuild fileCtxSb) {
+  @Override protected void toJavaPredictBody( final SB bodySb, final SB classCtxSb, final SB fileCtxSb) {
     SB model = new SB();
     bodySb.i().p("java.util.Arrays.fill(preds,0);").nl();
     final int cats = _output._ncats;
