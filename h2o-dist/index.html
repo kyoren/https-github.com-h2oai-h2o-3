@@ -354,6 +354,8 @@
         trackLink('doc-rest', 'Documentation', 'REST API');
         trackLink('doc-h2o-core-javadoc', 'Documentation', 'H2O Core Javadoc');
         trackLink('doc-h2o-algos-javadoc', 'Documentation', 'H2O Algos Javadoc');
+        trackLink('doc-h2o-genmodel-javadoc', 'Documentation', 'H2O Generated POJO Model Javadoc');
+        trackLink('doc-h2o-scala-javadoc', 'Documentation', 'H2O Scala Javadoc');
         trackLink('btnCopy1','Copy to Clipboard', 'Run H2O From Terminal');
         trackLink('btnCopy2','Copy to Clipboard', 'Use H2O directly from Python');
         trackLink('btnCopy3','Copy to Clipboard', 'Use H2O Directly from R');
@@ -522,13 +524,13 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                 <h2>Use H<sub>2</sub>O directly from Python</h2>
 
                 <p>1. Prerequisite:    Python 2.7</p>
-                <p>2. Install dependencies:</p>
+                <p>2. Install dependencies (prepending with `sudo` if needed):</p>
                  <button class="btn copy_button" id="btnCopy8" data-copied-hint="Copied!" data-clipboard-target='to_copy8'>
               <span class="octicon octicon-clippy"></span>
             </button>
                 <p class="terminal" id="to_copy8">
-                    pip install requests<br/>
-                    pip install tabulate
+                    [sudo] pip install requests<br/>
+                    [sudo] pip install tabulate
                 </p>
                 <p>At the command line, copy and paste these commands one line at a time:</p>
                   <button class="btn copy_button" id="btnCopy2" data-copied-hint="Copied!" data-clipboard-target='to_copy2'>
@@ -536,10 +538,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                   </button>
                 <p class="terminal" id="to_copy2">
                     <em># The following command removes the H<sub>2</sub>O module for Python.</em><br/>
-                    pip uninstall h2o<br/>
+                    [sudo] pip uninstall h2o<br/>
                     <br/>
                     <em># Next, use pip to install this version of the  H<sub>2</sub>O Python module.</em><br/>
-                    pip install <script type="text/javascript">var url = location.href; var url2 = url.substring(0, url.lastIndexOf("/")); document.write(url2);</script>/Python/SUBST_WHEEL_FILE_NAME<br/>
+                    [sudo] pip install <script type="text/javascript">var url = location.href; var url2 = url.substring(0, url.lastIndexOf("/")); document.write(url2);</script>/Python/SUBST_WHEEL_FILE_NAME<br/>
             </div>
 
             <div id="quickstart-r" style="display:none">
@@ -560,7 +562,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
                     if (! ("stats"    %in% rownames(installed.packages()))) { install.packages("stats") }<br/>
                     if (! ("graphics" %in% rownames(installed.packages()))) { install.packages("graphics") }<br/>
                     if (! ("RCurl"    %in% rownames(installed.packages()))) { install.packages("RCurl") }<br/>
-                    if (! ("rjson"    %in% rownames(installed.packages()))) { install.packages("rjson") }<br/>
+                    if (! ("jsonlite"    %in% rownames(installed.packages()))) { install.packages("jsonlite") }<br/>
                     if (! ("tools"    %in% rownames(installed.packages()))) { install.packages("tools") }<br/>
                     if (! ("utils"    %in% rownames(installed.packages()))) { install.packages("utils") }<br/>
                     <br/>
@@ -662,6 +664,7 @@ dependencies {</br>
             <li><a id="doc-rest" href="docs-website/h2o-docs/index.html">REST API Documentation</a></li>
             <li><a id="doc-h2o-core-javadoc" href="docs-website/h2o-core/javadoc/index.html">H2O Core Java Developer Documentation (Javadoc)</a></li>
             <li><a id="doc-h2o-algos-javadoc" href="docs-website/h2o-algos/javadoc/index.html">H2O Algos Java Developer Documentation (Javadoc)</a></li>
+            <li><a id="doc-h2o-genmodel-javadoc" href="docs-website/h2o-genmodel/javadoc/index.html">H2O Generated POJO Model API Developer Documentation (Javadoc)</a></li>
             <li><a id="doc-h2o-scala-javadoc" href="docs-website/h2o-scala/scaladoc/index.html">H2O Scala API Developer Documentation (Scaladoc)</a></li>
           </ul>
         </div>

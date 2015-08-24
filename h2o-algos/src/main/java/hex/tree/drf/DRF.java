@@ -202,8 +202,10 @@ public class DRF extends SharedTree<hex.tree.drf.DRFModel, hex.tree.drf.DRFModel
       for( tid=0; tid < _ntrees; tid++) { // Building tid-tree
         if (tid!=0 || !_parms.hasCheckpoint()) { // do not make initial scoring if model already exist
           double training_r2 = doScoringAndSaveModel(false, true, _parms._build_tree_one_node);
-          if( training_r2 >= _parms._r2_stopping )
+          if( training_r2 >= _parms._r2_stopping ) {
+            doScoringAndSaveModel(true, true, _parms._build_tree_one_node);
             return;             // Stop when approaching round-off error
+          }
         }
         // At each iteration build K trees (K = nclass = response column domain size)
 
@@ -378,7 +380,7 @@ public class DRF extends SharedTree<hex.tree.drf.DRFModel, hex.tree.drf.DRFModel
           if (importance) {
             if (wasOOBRow && !y.isNA(row)) {
               if (isClassifier()) {
-                int treePred = getPrediction(rpred, data_row(chks, row, rowdata), _threshold);
+                int treePred = getPrediction(rpred, _model._output._priorClassDist, data_row(chks, row, rowdata), _threshold);
                 int actuPred = (int) y.at8(row);
                 if (treePred==actuPred) rightVotes++; // No miss !
               } else { // regression
