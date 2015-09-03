@@ -1,9 +1,9 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 import random
 
-def test_get_future_model(ip,port):
+def test_get_future_model():
     
     
 
@@ -34,4 +34,4 @@ def test_get_future_model(ip,port):
     print(covtype_h2o3)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, test_get_future_model)
+    tests.run_test(sys.argv, test_get_future_model)

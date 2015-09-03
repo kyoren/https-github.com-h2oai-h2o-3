@@ -1,10 +1,10 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 import random
 import numpy as np
 
-def quantile(ip,port):
+def quantile():
     # Connect to a pre-existing cluster
     
 
@@ -23,4 +23,4 @@ def quantile(ip,port):
         "and numpy".format(h2o_val,np_val)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, quantile)
+    tests.run_test(sys.argv, quantile)

@@ -1,10 +1,10 @@
 # Check that slicings give the correct shape
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 import random
 
-def slicing_shape(ip,port):
+def slicing_shape():
     # Connect to a pre-existing cluster
     
 
@@ -40,4 +40,4 @@ def slicing_shape(ip,port):
            assert c == ncols, "incorrect number of cols. correct: {0}, computed: {1}".format(ncols, c)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, slicing_shape)
+    tests.run_test(sys.argv, slicing_shape)

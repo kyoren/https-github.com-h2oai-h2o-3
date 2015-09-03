@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1,"../../../")
-import h2o
+import h2o, tests
 
-def glm_mean_residual_deviance(ip,port):
+def glm_mean_residual_deviance():
 
     cars =  h2o.import_file(path=h2o.locate("smalldata/junit/cars_20mpg.csv"))
     s = cars[0].runif()
@@ -24,4 +24,4 @@ def glm_mean_residual_deviance(ip,port):
                                              "{0}".format(type(glm_mrd['xval']))
 
 if __name__ == '__main__':
-    h2o.run_test(sys.argv, glm_mean_residual_deviance)
+    tests.run_test(sys.argv, glm_mean_residual_deviance)

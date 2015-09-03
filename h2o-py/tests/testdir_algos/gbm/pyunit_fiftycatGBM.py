@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
-def fiftycatGBM(ip,port):
+def fiftycatGBM():
   
   
 
@@ -37,4 +37,4 @@ def fiftycatGBM(ip,port):
   test_auc = performance.auc()
 
 if __name__ == "__main__":
-  h2o.run_test(sys.argv, fiftycatGBM)
+  tests.run_test(sys.argv, fiftycatGBM)

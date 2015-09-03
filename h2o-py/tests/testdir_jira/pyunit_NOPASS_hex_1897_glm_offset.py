@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
-def offset_1897(ip, port):
+def offset_1897():
     
 
     print 'Checking binomial models for GLM with and without offset'
@@ -40,4 +40,4 @@ def offset_1897(ip, port):
     assert abs(2761.76218461138 - prostate_glm_h2o.residual_deviance()) < 0.1
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, offset_1897)
+    tests.run_test(sys.argv, offset_1897)

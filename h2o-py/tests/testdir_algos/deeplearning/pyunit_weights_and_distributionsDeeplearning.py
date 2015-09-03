@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
-def weights_and_distributions(ip,port):
+def weights_and_distributions():
 
     htable  = h2o.upload_file(h2o.locate("smalldata/gbm_test/moppe.csv"))
     htable["premiekl"] = htable["premiekl"].asfactor()
@@ -26,4 +26,4 @@ def weights_and_distributions(ip,port):
     predictions = dl.predict(htable)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, weights_and_distributions)
+    tests.run_test(sys.argv, weights_and_distributions)

@@ -1,9 +1,9 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
 
-def upload_file(ip, port):
+def upload_file():
     
 
     a = h2o.upload_file(h2o.locate("smalldata/logreg/prostate.csv"))
@@ -71,4 +71,4 @@ def upload_file(ip, port):
     # py_numpy_ary_to_h2o.describe()
 
 if __name__ == "__main__":
-  h2o.run_test(sys.argv, upload_file)
+  tests.run_test(sys.argv, upload_file)

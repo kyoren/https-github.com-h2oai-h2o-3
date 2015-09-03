@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
-def vi_reg(ip,port):
+def vi_reg():
     
     
 
@@ -16,4 +16,4 @@ def vi_reg(ip,port):
     assert tuple([ranking[0],ranking[1]]) == tuple(["rm","lstat"]), "expected specific variable importance ranking"
 
 if __name__ == "__main__":
-  h2o.run_test(sys.argv, vi_reg)
+  tests.run_test(sys.argv, vi_reg)

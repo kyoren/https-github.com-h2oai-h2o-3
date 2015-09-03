@@ -1,21 +1,36 @@
 package water;
 
-import water.H2ONode.H2OSmallMessage;
-import water.util.Log;
-import water.util.TwoDimTable;
+import com.google.common.base.Charsets;
 
-import java.io.*;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.EOFException;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.lang.reflect.Array;
-import java.net.*;
-import java.nio.*;
+import java.net.DatagramPacket;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.SocketAddress;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.DoubleBuffer;
+import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import java.nio.LongBuffer;
+import java.nio.ShortBuffer;
 import java.nio.channels.ByteChannel;
 import java.nio.channels.DatagramChannel;
 import java.nio.channels.FileChannel;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Random;
-import java.util.concurrent.LinkedBlockingDeque;
+
+import water.H2ONode.H2OSmallMessage;
+import water.util.Log;
+import water.util.TwoDimTable;
 
 /**
  * A ByteBuffer backed mixed Input/OutputStream class.
@@ -588,26 +603,16 @@ public /* final */ class AutoBuffer {
   /** Put as needed to keep from overflowing the ByteBuffer. */
   private ByteBuffer putSp( int sz ) {
     assert !_read;
-    while(sz > _bb.remaining())
-      sendPartial();
+    while (sz > _bb.remaining()) {
+      if ((_h2o==null && _chan == null) || (_bb.hasArray() && _bb.capacity() < BBP_BIG._size))
+        expandByteBuffer(sz);
+      else sendPartial();
+    }
     return _bb;
   }
   // Do something with partial results, because the ByteBuffer is full.
-  // If we are byte[] backed, double the backing array size.
   // If we are doing I/O, ship the bytes we have now and flip the ByteBuffer.
   private ByteBuffer sendPartial() {
-    // Writing into an expanding byte[]?
-    if( (_h2o==null && _chan == null) || (_bb.hasArray() && _bb.capacity() < MTU)) {
-      // This is a byte[] backed buffer; expand the backing byte[].
-      byte[] ary = _bb.array();
-      int newlen = ary.length<<1; // New size is 2x old size
-      if(_h2o != null && newlen > MTU)
-        newlen = MTU;
-      int oldpos = _bb.position();
-      _bb = ByteBuffer.wrap(MemoryManager.arrayCopyOfRange(ary,0,newlen),oldpos,newlen-oldpos)
-        .order(ByteOrder.nativeOrder());
-      return _bb;
-    }
     // Doing I/O with the full ByteBuffer - ship partial results
     _size += _bb.position();
     if( _chan == null )
@@ -634,18 +639,35 @@ public /* final */ class AutoBuffer {
       // declare (and then ignore) this exception.
       throw new AutoBufferException(e);
     }
-    if( _bb.capacity() < BBP_BIG._size ) {
-      if(_bb.isDirect())
-        BBP_SML.free(_bb);
-      _bb = BBP_BIG.make();
-    }
     _firstPage = false;
     _bb.clear();
     return _bb;
   }
 
+  // Called when the byte buffer doesn't have enough room
+  // If buffer is array backed, and the needed rooom is small,
+  // increase the size of the backing array,
+  // otherwise dump into a large direct buffer
+  private ByteBuffer expandByteBuffer(int sizeHint) {
+    int needed = sizeHint-_bb.remaining()+_bb.capacity();
+    if ((_h2o==null && _chan == null) || (_bb.hasArray() && needed < MTU)) {
+      byte[] ary = _bb.array();
+      // just get twice what is currently needed
+      int newLen = 1 << (water.util.MathUtils.log2(needed)+1);
+      int oldpos = _bb.position();
+      _bb = ByteBuffer.wrap(MemoryManager.arrayCopyOfRange(ary,0,newLen),oldpos,newLen-oldpos)
+          .order(ByteOrder.nativeOrder());
+    } else if (_bb.capacity() != BBP_BIG._size) { //avoid expanding existing BBP items
+      int oldPos = _bb.position();
+      _bb.flip();
+      _bb = BBP_BIG.make().put(_bb);
+      _bb.position(oldPos);
+    }
+    return _bb;
+  }
+
   @SuppressWarnings("unused")  public String getStr(int off, int len) {
-    return new String(_bb.array(), _bb.arrayOffset()+off, len);
+    return new String(_bb.array(), _bb.arrayOffset()+off, len, Charsets.UTF_8);
   }
 
   // -----------------------------------------------
@@ -748,14 +770,14 @@ public /* final */ class AutoBuffer {
     return this;
   }
 
-  public Enum[] getAEnum(Enum[] values) {
+  public <E extends Enum> E[] getAEnum(E[] values) {
     //_arys++;
     long xy = getZA();
     if( xy == -1 ) return null;
     int x=(int)(xy>>32);         // Leading nulls
     int y=(int)xy;               // Middle non-zeros
     int z = y==0 ? 0 : getInt(); // Trailing nulls
-    Enum[] ts = new Enum[x+y+z];
+    E[] ts = (E[]) Array.newInstance(values.getClass().getComponentType(), x+y+z);
     for( int i = x; i < x+y; ++i ) ts[i] = getEnum(values);
     return ts;
   }
@@ -1135,10 +1157,10 @@ public /* final */ class AutoBuffer {
 
   public String getStr( ) {
     int len = getInt();
-    return len == -1 ? null : new String(getA1(len));
+    return len == -1 ? null : new String(getA1(len), Charsets.UTF_8);
   }
 
-  public Enum getEnum(Enum[] values ) {
+  public <E extends Enum> E getEnum(E[] values ) {
     int idx = get1();
     return idx == -1 ? null : values[idx];
   }
@@ -1158,6 +1180,7 @@ public /* final */ class AutoBuffer {
   }
   public AutoBuffer putA1( byte[] ary, int length ) { return putA1(ary,0,length); }
   public AutoBuffer putA1( byte[] ary, int sofar, int length ) {
+    if (length - sofar > _bb.remaining()) expandByteBuffer(length-sofar);
     while( sofar < length ) {
       int len = Math.min(length - sofar, _bb.remaining());
       _bb.put(ary, sofar, len);
@@ -1170,6 +1193,7 @@ public /* final */ class AutoBuffer {
     //_arys++;
     if( ary == null ) return putInt(-1);
     putInt(ary.length);
+    if (ary.length*2 > _bb.remaining()) expandByteBuffer(ary.length*2);
     int sofar = 0;
     while( sofar < ary.length ) {
       ShortBuffer sb = _bb.asShortBuffer();
@@ -1185,13 +1209,14 @@ public /* final */ class AutoBuffer {
     //_arys++;
     if( ary == null ) return putInt(-1);
     putInt(ary.length);
+    if (ary.length*4 > _bb.remaining()) expandByteBuffer(ary.length*4);
     int sofar = 0;
     while( sofar < ary.length ) {
-      IntBuffer sb = _bb.asIntBuffer();
-      int len = Math.min(ary.length - sofar, sb.remaining());
-      sb.put(ary, sofar, len);
+      IntBuffer ib = _bb.asIntBuffer();
+      int len = Math.min(ary.length - sofar, ib.remaining());
+      ib.put(ary, sofar, len);
       sofar += len;
-      _bb.position(_bb.position() + sb.position()*4);
+      _bb.position(_bb.position() + ib.position()*4);
       if( sofar < ary.length ) sendPartial();
     }
     return this;
@@ -1227,12 +1252,13 @@ public /* final */ class AutoBuffer {
 
     put1(8);                    // Ship as full longs
     int sofar = x;
+    if ((y-sofar)*8 > _bb.remaining()) expandByteBuffer(ary.length*8);
     while( sofar < y ) {
-      LongBuffer sb = _bb.asLongBuffer();
-      int len = Math.min(y - sofar, sb.remaining());
-      sb.put(ary, sofar, len);
+      LongBuffer lb = _bb.asLongBuffer();
+      int len = Math.min(y - sofar, lb.remaining());
+      lb.put(ary, sofar, len);
       sofar += len;
-      _bb.position(_bb.position() + sb.position()*8);
+      _bb.position(_bb.position() + lb.position() * 8);
       if( sofar < y ) sendPartial();
     }
     return this;
@@ -1241,13 +1267,14 @@ public /* final */ class AutoBuffer {
     //_arys++;
     if( ary == null ) return putInt(-1);
     putInt(ary.length);
+    if (ary.length*4 > _bb.remaining()) expandByteBuffer(ary.length*4);
     int sofar = 0;
     while( sofar < ary.length ) {
-      FloatBuffer sb = _bb.asFloatBuffer();
-      int len = Math.min(ary.length - sofar, sb.remaining());
-      sb.put(ary, sofar, len);
+      FloatBuffer fb = _bb.asFloatBuffer();
+      int len = Math.min(ary.length - sofar, fb.remaining());
+      fb.put(ary, sofar, len);
       sofar += len;
-      _bb.position(_bb.position() + sb.position()*4);
+      _bb.position(_bb.position() + fb.position()*4);
       if( sofar < ary.length ) sendPartial();
     }
     return this;
@@ -1256,19 +1283,20 @@ public /* final */ class AutoBuffer {
     //_arys++;
     if( ary == null ) return putInt(-1);
     putInt(ary.length);
+    if (ary.length*8 > _bb.remaining()) expandByteBuffer(ary.length*8);
     int sofar = 0;
     while( sofar < ary.length ) {
-      DoubleBuffer sb = _bb.asDoubleBuffer();
-      int len = Math.min(ary.length - sofar, sb.remaining());
-      sb.put(ary, sofar, len);
+      DoubleBuffer db = _bb.asDoubleBuffer();
+      int len = Math.min(ary.length - sofar, db.remaining());
+      db.put(ary, sofar, len);
       sofar += len;
-      _bb.position(_bb.position() + sb.position()*8);
+      _bb.position(_bb.position() + db.position()*8);
       if( sofar < ary.length ) sendPartial();
     }
     return this;
   }
 
-  @SuppressWarnings("unused")  AutoBuffer putAA1( byte[][] ary ) {
+  public AutoBuffer putAA1( byte[][] ary ) {
     //_arys++;
     long xy = putZA(ary);
     if( xy == -1 ) return this;
@@ -1353,11 +1381,7 @@ public /* final */ class AutoBuffer {
   // Put a String as bytes (not chars!)
   public AutoBuffer putStr( String s ) {
     if( s==null ) return putInt(-1);
-    // Use the explicit getBytes instead of the default no-arg one, to avoid
-    // the overhead of going in an out of a charset decoder.
-    byte[] buf = MemoryManager.malloc1(s.length());
-    s.getBytes(0,buf.length,buf,0);
-    return putA1(buf);
+    return putA1(s.getBytes(Charsets.UTF_8));
   }
 
   @SuppressWarnings("unused")  public AutoBuffer putEnum( Enum x ) {

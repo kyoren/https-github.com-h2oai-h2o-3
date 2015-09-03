@@ -1,6 +1,6 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 from h2o import H2OFrame
 
 import numpy as np
@@ -9,7 +9,7 @@ import scipy.stats
 from sklearn import ensemble
 from sklearn.metrics import roc_auc_score
 
-def bernoulli_synthetic_data_mediumGBM(ip,port):
+def bernoulli_synthetic_data_mediumGBM():
     
     
 
@@ -65,4 +65,4 @@ def bernoulli_synthetic_data_mediumGBM(ip,port):
                                "scickit auc: {1}".format(auc_h2o, auc_sci)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, bernoulli_synthetic_data_mediumGBM)
+    tests.run_test(sys.argv, bernoulli_synthetic_data_mediumGBM)

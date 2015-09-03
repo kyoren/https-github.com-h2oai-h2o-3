@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
-def pyunit_unique(ip,port):
+def pyunit_unique():
 
     iris = h2o.import_file(h2o.locate("smalldata/iris/iris.csv"))
     uniques = iris[4].unique()
@@ -13,7 +13,7 @@ def pyunit_unique(ip,port):
     assert "Iris-versicolor" in uniques[0], "Expected Iris-versicolor to be in the set of unique species, but it wasn't"
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, pyunit_unique)
+    tests.run_test(sys.argv, pyunit_unique)
 
 
 

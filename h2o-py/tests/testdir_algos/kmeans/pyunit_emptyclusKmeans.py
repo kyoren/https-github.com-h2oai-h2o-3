@@ -1,13 +1,13 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
 import random
 import numpy as np
 from sklearn import preprocessing
 from sklearn.cluster import KMeans
 
-def emptyclusKmeans(ip,port):
+def emptyclusKmeans():
     # Connect to a pre-existing cluster
       # connect to localhost:54321
 
@@ -51,4 +51,4 @@ def emptyclusKmeans(ip,port):
     print km_h2o.centers()
 
 if __name__ == "__main__":
-   h2o.run_test(sys.argv, emptyclusKmeans)
+   tests.run_test(sys.argv, emptyclusKmeans)

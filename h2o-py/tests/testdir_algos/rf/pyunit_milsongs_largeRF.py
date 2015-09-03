@@ -1,9 +1,9 @@
 import sys, shutil
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 import random
 
-def milsong_checkpoint(ip,port):
+def milsong_checkpoint():
 
     milsong_train = h2o.upload_file(h2o.locate("bigdata/laptop/milsongs/milsongs-train.csv.gz"))
     milsong_valid = h2o.upload_file(h2o.locate("bigdata/laptop/milsongs/milsongs-test.csv.gz"))
@@ -42,4 +42,4 @@ def milsong_checkpoint(ip,port):
     assert model2.mse(valid=True)==model3.mse(valid=True), "Expected Model 2 MSE: {0} to be the same as Model 4 MSE: {1}".format(model2.mse(valid=True), model3.mse(valid=True))
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, milsong_checkpoint)
+    tests.run_test(sys.argv, milsong_checkpoint)

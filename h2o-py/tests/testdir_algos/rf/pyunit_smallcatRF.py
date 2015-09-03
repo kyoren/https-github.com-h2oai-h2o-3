@@ -1,12 +1,12 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
 import numpy as np
 from sklearn import ensemble
 from sklearn.metrics import roc_auc_score
 
-def smallcatRF(ip,port):
+def smallcatRF():
 
     # Training set has 26 categories from A to Z
     # Categories A, C, E, G, ... are perfect predictors of y = 1
@@ -47,4 +47,4 @@ def smallcatRF(ip,port):
     assert auc_h2o >= auc_sci, "h2o (auc) performance degradation, with respect to scikit"
 
 if __name__ == "__main__":
-  h2o.run_test(sys.argv, smallcatRF)
+  tests.run_test(sys.argv, smallcatRF)

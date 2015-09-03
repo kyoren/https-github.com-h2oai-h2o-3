@@ -1,8 +1,8 @@
 import sys, shutil
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
-def cars_checkpoint(ip,port):
+def cars_checkpoint():
 
     cars = h2o.upload_file(h2o.locate("smalldata/junit/cars_20mpg.csv"))
     predictors = ["displacement","power","weight","acceleration","year"]
@@ -62,4 +62,4 @@ def cars_checkpoint(ip,port):
 
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, cars_checkpoint)
+    tests.run_test(sys.argv, cars_checkpoint)

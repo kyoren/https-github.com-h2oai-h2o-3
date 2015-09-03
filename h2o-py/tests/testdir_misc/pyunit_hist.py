@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
-def hist_test(ip,port):
+def hist_test():
     
     
 
@@ -15,4 +15,4 @@ def hist_test(ip,port):
     hex["VOL"].hist(**kwargs)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, hist_test)
+    tests.run_test(sys.argv, hist_test)

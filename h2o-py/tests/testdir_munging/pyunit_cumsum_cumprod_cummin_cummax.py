@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
-def cumsumminprodmax(ip,port):
+def cumsumminprodmax():
     # TODO PUBDEV-1748
     foo = h2o.H2OFrame(python_obj=[[x,y] for x,y in zip(range(10),range(9,-1,-1))])
     foo.show()
@@ -34,4 +34,4 @@ def cumsumminprodmax(ip,port):
     h2o.remove(foo)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, cumsumminprodmax)
+    tests.run_test(sys.argv, cumsumminprodmax)

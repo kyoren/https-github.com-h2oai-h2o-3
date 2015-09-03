@@ -1,12 +1,12 @@
 import sys, os
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
 import numpy as np
 from sklearn import ensemble
 from sklearn.metrics import roc_auc_score
 
-def bernoulliGBM(ip,port):
+def bernoulliGBM():
   
   
 
@@ -64,4 +64,4 @@ def bernoulliGBM(ip,port):
   assert auc_h2o >= auc_sci, "h2o (auc) performance degradation, with respect to scikit"
 
 if __name__ == "__main__":
-  h2o.run_test(sys.argv, bernoulliGBM)
+  tests.run_test(sys.argv, bernoulliGBM)

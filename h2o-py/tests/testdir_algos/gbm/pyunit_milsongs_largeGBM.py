@@ -1,9 +1,9 @@
 import sys, shutil
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 import random
 
-def milsong_checkpoint(ip,port):
+def milsong_checkpoint():
 
     milsong_train = h2o.upload_file(h2o.locate("bigdata/laptop/milsongs/milsongs-train.csv.gz"))
     milsong_valid = h2o.upload_file(h2o.locate("bigdata/laptop/milsongs/milsongs-test.csv.gz"))
@@ -40,4 +40,4 @@ def milsong_checkpoint(ip,port):
                      distribution=distribution,validation_x=milsong_valid[1:],validation_y=milsong_valid[0])
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, milsong_checkpoint)
+    tests.run_test(sys.argv, milsong_checkpoint)

@@ -1,12 +1,12 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
 ######################################################
 #
 # Sample Running GBM on iris_wheader.csv
 
-def irisGBM(ip,port):
+def irisGBM():
   # Connect to a pre-existing cluster
     # connect to localhost:54321
 
@@ -30,4 +30,4 @@ def irisGBM(ip,port):
   my_gbm_metrics  #.show(criterion=my_gbm_metrics.theCriteria.PRECISION)
 
 if __name__ == "__main__":
-  h2o.run_test(sys.argv, irisGBM)
+  tests.run_test(sys.argv, irisGBM)

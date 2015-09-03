@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
-def pyunit_pop(ip,port):
+def pyunit_pop():
 
   pros = h2o.import_file(h2o.locate("smalldata/prostate/prostate.csv"))
   nc = pros.ncol
@@ -15,4 +15,4 @@ def pyunit_pop(ip,port):
   assert pros.ncol==nc-1
 
 if __name__ == "__main__":
-  h2o.run_test(sys.argv, pyunit_pop)
+  tests.run_test(sys.argv, pyunit_pop)

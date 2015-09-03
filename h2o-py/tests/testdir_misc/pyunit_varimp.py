@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
-def varimp_test(ip,port):
+def varimp_test():
     
     
     train = h2o.import_file(path=h2o.locate("smalldata/iris/iris_wheader.csv"))
@@ -20,4 +20,4 @@ def varimp_test(ip,port):
                                         "scaled_importance, percentage), but it has {0}".format(len(should_be_list[0]))
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, varimp_test)
+    tests.run_test(sys.argv, varimp_test)

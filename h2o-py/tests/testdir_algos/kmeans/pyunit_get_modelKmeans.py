@@ -1,12 +1,12 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import Imputer
 
-def get_modelKmeans(ip,port):
+def get_modelKmeans():
     # Connect to a pre-existing cluster
       # connect to localhost:54321
 
@@ -32,5 +32,5 @@ def get_modelKmeans(ip,port):
         print km_sci.cluster_centers_
 
 if __name__ == "__main__":
-   h2o.run_test(sys.argv, get_modelKmeans)
+   tests.run_test(sys.argv, get_modelKmeans)
 

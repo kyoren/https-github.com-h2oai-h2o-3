@@ -89,7 +89,8 @@ public class RequestServer extends NanoHTTPD {
     register("/3/SplitFrame" ,"POST",SplitFrameHandler.class,"run"         , null,"Split a H2O Frame.");
     register("/3/Interaction","POST",InteractionHandler.class,"run"        , null,"Create interactions between categorical columns.");
     register("/3/MissingInserter" ,"POST",MissingInserterHandler.class,"run", null,"Insert missing values.");
-    register("/99/FFTTransformer" ,"POST",FFTTransformerHandler.class,"run" , null,"Create FFT transformation.");
+    register("/99/DCTTransformer" ,"POST",DCTTransformerHandler.class,"run" , null,"Row-by-Row discrete cosine transforms in 1D, 2D and 3D.");
+    register("/99/Tabulate"  ,"POST",TabulateHandler.class,"run",            null,"Tabulate one column vs another.");
     register("/3/ImportFiles","GET",ImportFilesHandler.class,"importFiles" , null,"Import raw data files into a single-column H2O Frame.");
     register("/3/ImportFiles","POST",ImportFilesHandler.class,"importFiles" , null,"Import raw data files into a single-column H2O Frame.");
     register("/3/ParseSetup" ,"POST",ParseSetupHandler.class,"guessSetup"  , null,"Guess the parameters for parsing raw byte-oriented data into an H2O Frame.");
@@ -262,6 +263,7 @@ public class RequestServer extends NanoHTTPD {
     register("/99/Rapids"                                          ,"POST"  ,RapidsHandler.class, "exec", null, "Something something R exec something.");
     register("/99/Rapids/isEval"                                   ,"GET"   ,RapidsHandler.class, "isEvaluated", null, "something something r exec something.");
     register("/3/DownloadDataset"                                  ,"GET"   ,DownloadDataHandler.class, "fetch", null, "Download something something.");
+    register("/3/DownloadDataset.bin"                                  ,"GET"   ,DownloadDataHandler.class, "fetchStreaming", null, "Download something something via streaming response");
     register("/3/DKV/(?<key>.*)"                                   ,"DELETE",RemoveHandler.class, "remove", null, "Remove an arbitrary key from the H2O distributed K/V store.");
     register("/3/DKV"                                              ,"DELETE",RemoveAllHandler.class, "remove", null, "Remove all keys from the H2O distributed K/V store.");
     register("/3/LogAndEcho"                                       ,"POST"  ,LogAndEchoHandler.class, "echo", null, "Save a message to the H2O logfile.");

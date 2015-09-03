@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
-def confusion_matrices_check(ip, port):
+def confusion_matrices_check():
     
 
     local_data = [[1, 'a'],[1, 'a'],[1, 'a'],[1, 'a'],[1, 'a'],[1, 'a'],[1, 'a'],[1, 'a'],[1, 'a'],[1, 'a'],[0, 'b'],
@@ -23,4 +23,4 @@ def confusion_matrices_check(ip, port):
                                         "{3}. Should sum to 20.".format(tps, fps, tns, fns)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, confusion_matrices_check)
+    tests.run_test(sys.argv, confusion_matrices_check)

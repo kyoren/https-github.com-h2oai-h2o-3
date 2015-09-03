@@ -1,10 +1,10 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 import pandas as pd
 import numpy as np
 
-def group_by(ip,port):
+def group_by():
     # Connect to a pre-existing cluster
     
 
@@ -32,4 +32,4 @@ def group_by(ip,port):
         .sum(  na=na)
       print grouped.get_frame()
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, group_by)
+    tests.run_test(sys.argv, group_by)

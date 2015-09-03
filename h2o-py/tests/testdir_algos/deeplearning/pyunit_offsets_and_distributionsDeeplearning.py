@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
-def offsets_and_distributions(ip,port):
+def offsets_and_distributions():
 
     # cars
     cars = h2o.upload_file(h2o.locate("smalldata/junit/cars_20mpg.csv"))
@@ -38,4 +38,4 @@ def offsets_and_distributions(ip,port):
     predictions = dl.predict(insurance)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, offsets_and_distributions)
+    tests.run_test(sys.argv, offsets_and_distributions)

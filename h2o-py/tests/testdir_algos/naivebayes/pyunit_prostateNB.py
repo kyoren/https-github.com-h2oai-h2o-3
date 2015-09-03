@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
-def nb_prostate(ip, port):
+def nb_prostate():
     
 
     print "Importing prostate.csv data..."
@@ -23,4 +23,4 @@ def nb_prostate(ip, port):
     prostate_pred.head()
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, nb_prostate)
+    tests.run_test(sys.argv, nb_prostate)

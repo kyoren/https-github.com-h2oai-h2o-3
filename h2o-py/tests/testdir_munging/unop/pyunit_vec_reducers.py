@@ -1,10 +1,10 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 import numpy as np
 import random
 
-def frame_reducers(ip,port):
+def frame_reducers():
     
     
 
@@ -52,4 +52,4 @@ def frame_reducers(ip,port):
         "numpy".format(h2o_val,num_val)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, frame_reducers)
+    tests.run_test(sys.argv, frame_reducers)

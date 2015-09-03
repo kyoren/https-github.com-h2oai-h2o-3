@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
-def perfectSeparation_unbalanced(ip,port):
+def perfectSeparation_unbalanced():
     
     
 
@@ -19,4 +19,4 @@ def perfectSeparation_unbalanced(ip,port):
         assert c < 50, "coefficient is too large"
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, perfectSeparation_unbalanced)
+    tests.run_test(sys.argv, perfectSeparation_unbalanced)

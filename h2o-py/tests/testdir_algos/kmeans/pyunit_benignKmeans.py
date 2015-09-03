@@ -1,12 +1,12 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
 import numpy as np
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import Imputer
 
-def benignKmeans(ip,port):
+def benignKmeans():
     # Connect to a pre-existing cluster
       # connect to localhost:54321
 
@@ -32,4 +32,4 @@ def benignKmeans(ip,port):
         print benign_sci_km.cluster_centers_
 
 if __name__ == "__main__":
-  h2o.run_test(sys.argv, benignKmeans)
+  tests.run_test(sys.argv, benignKmeans)

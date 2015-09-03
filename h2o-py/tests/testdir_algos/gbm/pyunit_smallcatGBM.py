@@ -1,11 +1,11 @@
 import sys
 sys.path.insert(1, "../../../")
-import h2o
+import h2o, tests
 
 import numpy as np
 from sklearn import ensemble
 
-def smallcatGBM(ip,port):
+def smallcatGBM():
   # Training set has 26 categories from A to Z
   # Categories A, C, E, G, ... are perfect predictors of y = 1
   # Categories B, D, F, H, ... are perfect predictors of y = 0
@@ -36,4 +36,4 @@ def smallcatGBM(ip,port):
   gbm_sci.fit(trainDataFeatures[:,np.newaxis],trainDataResponse)
 
 if __name__ == "__main__":
-  h2o.run_test(sys.argv, smallcatGBM)
+  tests.run_test(sys.argv, smallcatGBM)

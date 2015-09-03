@@ -1,9 +1,9 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 import random
 
-def all_confusion_matrix_funcs(ip,port):
+def all_confusion_matrix_funcs():
     
     
 
@@ -130,4 +130,4 @@ def all_confusion_matrix_funcs(ip,port):
         format(air_test.nrow, cm_count)
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, all_confusion_matrix_funcs)
+    tests.run_test(sys.argv, all_confusion_matrix_funcs)

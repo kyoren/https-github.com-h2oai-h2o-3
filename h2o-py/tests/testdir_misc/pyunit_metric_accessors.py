@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
-def metric_accessors(ip,port):
+def metric_accessors():
 
     cars = h2o.import_file(path=h2o.locate("smalldata/junit/cars_20mpg.csv"))
     r = cars[0].runif()
@@ -567,4 +567,4 @@ def metric_accessors(ip,port):
     size = km.size(train=False, valid=False, xval=False) # default: return training metrics
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, metric_accessors)
+    tests.run_test(sys.argv, metric_accessors)

@@ -30,6 +30,8 @@ import java.math.RoundingMode;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static water.util.RandomUtils.getRNG;
+
 /**
  * Parse a generic R string and build an AST, in the context of an H2O Cloud
  */
@@ -179,6 +181,7 @@ public abstract class ASTOp extends AST {
     putPrefix(new ASTMad());
 
     // Misc
+    putPrefix(new ASTKFold());
     putPrefix(new ASTPop());
     putPrefix(new ASTSetLevel());
     putPrefix(new ASTMatch ());
@@ -250,6 +253,7 @@ public abstract class ASTOp extends AST {
     // string mungers
     putPrefix(new ASTGSub());
     putPrefix(new ASTStrSplit());
+    putPrefix(new ASTCountMatches());
     putPrefix(new ASTStrSub());
     putPrefix(new ASTToLower());
     putPrefix(new ASTToUpper());
@@ -1029,7 +1033,6 @@ class ASTScale extends ASTUniPrefixOp {
 
   @Override void apply(Env env) {
     Frame fr = env.popAry();
-    for (int i = 0; i < fr.numCols(); ++i) if (fr.vecs()[i].isEnum()) throw new IllegalArgumentException(("All columns must be numeric."));
     if (!(_centers == null) && _centers.length != fr.numCols()) throw new IllegalArgumentException("`centers` must be logical or have length equal to the number of columns in the dataset.");
     if (!(_scales  == null) && _scales.length  != fr.numCols()) throw new IllegalArgumentException("`scales` must be logical or have length equal to the number of columns in the dataset.");
     final boolean use_mean = _centers == null && _center;
@@ -1055,10 +1058,13 @@ class ASTScale extends ASTUniPrefixOp {
           int cols = cs.length;
           for (int r = 0; r < rows; ++r)
             for (int c = 0; c < cols; ++c) {
-              double numer = cs[c].atd(r) - (use_mean
-                      ? cs[c].vec().mean()
-                      : centers == null ? 0 : centers[c]);
-              ncs[c].addNum(numer);
+              if (cs[c].vec().isEnum()) ncs[c].addNum(cs[c].at8(r), 0);
+              else {
+                double numer = cs[c].atd(r) - (use_mean
+                        ? cs[c].vec().mean()
+                        : centers == null ? 0 : centers[c]);
+                ncs[c].addNum(numer);
+              }
             }
         }
       }.doAll(fr.numCols(), fr).outputFrame(fr.names(), fr.domains());
@@ -1085,10 +1091,13 @@ class ASTScale extends ASTUniPrefixOp {
           int cols = cs.length;
           for (int r = 0; r < rows; ++r)
             for (int c = 0; c < cols; ++c) {
-              double denom = cs[c].atd(r) / (use_rms
-                      ? rms[c] : use_sig ? cs[c].vec().sigma()
-                      : scales == null ? 1 : scales[c]);
-              ncs[c].addNum(denom);
+              if (cs[c].vec().isEnum()) ncs[c].addNum(cs[c].at8(r), 0);
+              else {
+                double denom = cs[c].atd(r) / (use_rms
+                        ? rms[c] : use_sig ? cs[c].vec().sigma()
+                        : scales == null ? 1 : scales[c]);
+                ncs[c].addNum(denom);
+              }
             }
         }
       }.doAll(centered.numCols(), centered).outputFrame(centered.names(), centered.domains());
@@ -2217,9 +2226,38 @@ class ASTUnique extends ASTUniPrefixOp {
   }
 }
 
+class ASTKFold extends ASTUniPrefixOp {
+  int _nfolds;
+  long _seed;
+  @Override String opStr() { return "kfold_column"; }
+  @Override ASTOp make() { return new ASTKFold(); }
+  public ASTKFold() { super(new String[]{"x","nfolds", "seed"});}
+  ASTKFold parse_impl(Exec E) {
+    AST ary = E.parse();
+    _nfolds = (int)E.nextDbl();
+    _seed = (long)E.nextDbl();
+    E.eatEnd();
+    ASTKFold res = (ASTKFold)clone();
+    res._asts = new AST[]{ary};
+    return res;
+  }
+  @Override public void apply(Env e) {
+    Vec foldVec = e.popAry().anyVec().makeZero();
+    if( _seed == -1 ) _seed = new Random().nextLong();
+    new MRTask() {
+      @Override public void map(Chunk c) {
+        long start = c.start();
+        for (int i = 0; i < c._len; ++i) {
+          int fold = Math.abs(getRNG(start + _seed + i).nextInt()) % _nfolds;
+          c.set(i, fold);
+        }
+      }
+    }.doAll(foldVec);
+    e.pushAry(new Frame(foldVec));
+  }
+}
 
 class ASTKappa extends ASTUniPrefixOp {
-
   int _nclass;
   @Override String opStr() { return "kappa"; }
   @Override ASTOp make() { return new ASTKappa(); }
@@ -3826,7 +3864,7 @@ class ASTSdev extends ASTUniPrefixOp {
         Key key = Vec.VectorGroup.VG_LEN1.addVecs(1)[0];
         AppendableVec v = new AppendableVec(key);
         NewChunk chunk = new NewChunk(v, 0);
-        for( int i=0;i<fr.numCols();++i ) chunk.addNum(fr.vec(i).sigma());
+        for( int i=0;i<fr.numCols();++i ) chunk.addNum(fr.vec(i).isEnum()?Double.NaN:fr.vec(i).sigma());
         chunk.close(0,fs);
         Vec vec = v.close(fs);
         fs.blockForPending();
@@ -3834,7 +3872,9 @@ class ASTSdev extends ASTUniPrefixOp {
         DKV.put(fr2);  // push this soggy frame into dkv, let R handle the rest...
         env.pushAry(fr2);
       } else {
-        double sig = Math.sqrt(ASTVar.getVar(fr.anyVec(), _narm));
+        double sig;
+        if( fr.anyVec().isEnum() ) sig = Double.NaN;
+        else                       sig = Math.sqrt(ASTVar.getVar(fr.anyVec(), _narm));
         env.poppush(1, new ValNum(sig));
       }
     }
@@ -4039,10 +4079,6 @@ class ASTMean extends ASTUniPrefixOp {
   @Override void apply(Env env) {
     if (env.isNum()) return;
     Frame fr = env.popAry(); // get the frame w/o sub-reffing
-//    if (fr.numCols() > 1 && fr.numRows() > 1)
-//      throw new IllegalArgumentException("mean does not apply to multiple cols.");
-    for (Vec v : fr.vecs()) if (v.isEnum())
-      throw new IllegalArgumentException("mean only applies to numeric columns.");
     if (fr.numCols() > 1 && fr.numRows()==1) {
       double mean=0;
       double rows=0;
@@ -4056,7 +4092,7 @@ class ASTMean extends ASTUniPrefixOp {
       Key key = Vec.VectorGroup.VG_LEN1.addVecs(1)[0];
       AppendableVec v = new AppendableVec(key);
       NewChunk chunk = new NewChunk(v, 0);
-      for( int i=0;i<fr.numCols();++i ) chunk.addNum(fr.vec(i).mean());
+      for( int i=0;i<fr.numCols();++i ) chunk.addNum(fr.vec(i).isEnum()?Double.NaN:fr.vec(i).mean());
       chunk.close(0,fs);
       Vec vec = v.close(fs);
       fs.blockForPending();
@@ -4065,6 +4101,7 @@ class ASTMean extends ASTUniPrefixOp {
       env.pushAry(fr2);
     } else {
       Vec v = fr.anyVec();
+      if( v.isEnum() ) { env.push(new ValNum(Double.NaN)); return; }
       if( _narm || v.naCnt()==0 ) env.push(new ValNum(v.mean()));
       else {
         MeanNARMTask t = new MeanNARMTask(false).doAll(v);

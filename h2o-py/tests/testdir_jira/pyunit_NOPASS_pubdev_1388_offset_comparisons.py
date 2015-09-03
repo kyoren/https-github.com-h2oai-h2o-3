@@ -1,8 +1,8 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
-def offset_1388(ip, port):
+def offset_1388():
     
 
     print "Loading datasets..."
@@ -72,4 +72,4 @@ def offset_1388(ip, port):
     assert abs(float('inf') - glm_h2o.aic()) < 0.1
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, offset_1388)
+    tests.run_test(sys.argv, offset_1388)

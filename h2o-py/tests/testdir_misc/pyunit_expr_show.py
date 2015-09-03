@@ -1,9 +1,9 @@
 import sys
 sys.path.insert(1, "../../")
-import h2o
+import h2o, tests
 
 
-def expr_show(ip,port):
+def expr_show():
     
     
 
@@ -25,4 +25,4 @@ def expr_show(ip,port):
     res3.show()
 
 if __name__ == "__main__":
-    h2o.run_test(sys.argv, expr_show)
+    tests.run_test(sys.argv, expr_show)
