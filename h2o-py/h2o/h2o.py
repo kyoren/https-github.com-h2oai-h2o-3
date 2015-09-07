@@ -1491,6 +1491,18 @@ def naive_bayes(x,y,validation_x=None,validation_y=None,training_frame=None,vali
   parms["algo"]="naivebayes"
   return h2o_model_builder.supervised(parms)
 
+def grid(algo, parameters, hyper_parameters, grid_id=None, is_supervised=None):
+    """
+    Grid entry point.
+
+    Parameters
+    ----------
+    """
+    params = paramterers
+    params["hyper_parameters"] = hyper_parameters
+
+    return h2o_grid_builder.build(params)
+
 def create_frame(id = None, rows = 10000, cols = 10, randomize = True, value = 0, real_range = 100,
                  categorical_fraction = 0.2, factors = 100, integer_fraction = 0.2, integer_range = 100,
                  binary_fraction = 0.1, binary_ones_fraction = 0.02, missing_fraction = 0.01, response_factors = 2,
