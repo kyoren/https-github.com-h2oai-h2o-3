@@ -228,6 +228,7 @@ h2o.startGLMJob <- function(x, y, training_frame, model_id, validation_frame,
                     lambda_min_ratio = 1.0,
                     nfolds = 0,
                     beta_constraints = NULL,
+                    obj_reg = -1,
                     ...
                     )
 {
@@ -285,6 +286,8 @@ h2o.startGLMJob <- function(x, y, training_frame, model_id, validation_frame,
       parms$lambda_min_ratio <- lambda_min_ratio
     if(!missing(nfolds))
       parms$nfolds <- nfolds
+    if(!missing(obj_reg))
+      parms$obj_reg <- obj_reg
 
     .h2o.startModelJob(training_frame@conn, 'glm', parms)
 }

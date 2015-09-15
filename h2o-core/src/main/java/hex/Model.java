@@ -53,7 +53,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
     return 0.5;
   }
 
-  public final boolean isSupervised() { return _output.isSupervised(); }
+  public boolean isSupervised() { return _output.isSupervised(); }
 
   /** Model-specific parameter class.  Each model sub-class contains an
    *  instance of one of these containing its builder parameters, with
@@ -419,7 +419,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
       return mm;                // Flow coding
     }
 
-    long checksum_impl() {
+    protected long checksum_impl() {
       return (null == _names ? 13 : Arrays.hashCode(_names)) *
               (null == _domains ? 17 : Arrays.deepHashCode(_domains)) *
               getModelCategory().ordinal();

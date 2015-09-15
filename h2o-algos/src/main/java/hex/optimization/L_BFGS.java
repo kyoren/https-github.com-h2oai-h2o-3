@@ -280,9 +280,8 @@ public final class L_BFGS extends Iced {
             ls_switch = 0;
             doLineSearch = false;
           }
-        } else {
+        } else
           ls_switch = 0;
-        }
         if (ls.madeProgress || _hist._k < 2) {
           ArrayUtils.wadd(beta, pk, ls.step);
         } else {

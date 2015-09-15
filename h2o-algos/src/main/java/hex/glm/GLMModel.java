@@ -27,6 +27,7 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     _output = job == null?new GLMOutput():new GLMOutput(job);
   }
 
+  @Override public boolean isSupervised(){return true;}
   @Override
   protected boolean toJavaCheckTooBig() {
     if(beta() != null && beta().length > 10000) {
@@ -53,6 +54,7 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
   }
 
   public double [] beta() { return _output._global_beta;}
+
   public String [] names(){ return _output._names;}
 
   @Override
@@ -65,6 +67,8 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
       return Double.NaN; //TODO: add deviance(w, y, f)
     }
   }
+
+
 
   public static class GLMParameters extends Model.Parameters {
     // public int _response; // TODO: the standard is now _response_column in SupervisedModel.SupervisedParameters
@@ -88,6 +92,7 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     public double _beta_epsilon = 1e-5;
     public double _objective_epsilon = 1e-5;
     public double _gradient_epsilon = 1e-4;
+    public double _obj_reg = -1;
 
     public Key<Frame> _beta_constraints = null;
     // internal parameter, handle with care. GLM will stop when there is more than this number of active predictors (after strong rule screening)
@@ -107,7 +112,7 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
         glm.hide("_tweedie_variance_power","Only applicable with Tweedie family");
         glm.hide("_tweedie_link_power","Only applicable with Tweedie family");
       }
-
+      glm.hide("_obj_reg","only used for consensus ADMM");
       if(_beta_constraints != null) {
         Frame f = _beta_constraints.get();
         if(f == null) glm.error("beta_constraints","Missing frame for beta constraints");
@@ -388,6 +393,7 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     public final int    iteration;
     public final double devianceTrain;
     public final double devianceTest;
+    public final double gerr;
     public final int    [] idxs;
     public final double [] beta;
 
@@ -395,11 +401,12 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
       return idxs != null?idxs.length+1:beta.length;
     }
 
-    public Submodel(double lambda , double [] beta, int iteration, double devTrain, double devTest){
+    public Submodel(double lambda , double [] beta, int iteration, double gerr, double devTrain, double devTest){
       this.lambda_value = lambda;
       this.iteration = iteration;
       this.devianceTrain = devTrain;
       this.devianceTest = devTest;
+      this.gerr = gerr;
       int r = 0;
       if(beta != null){
         // grab the indeces of non-zero coefficients
@@ -461,6 +468,15 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
       this(dinfo,column_names,domains,coefficient_names,binomial);
       _global_beta=beta;
     }
+
+    @Override public long checksum_impl() { // need this so that model can be updated via glm make model call and re-scored
+      super.checksum_impl();
+      return hashCode();
+//      long res = (_global_beta == null?1:Arrays.hashCode(_global_beta)) * super.checksum_impl();
+//      return res;
+    }
+
+    @Override public boolean isSupervised(){return true;}
 
     public GLMOutput() {_isSupervised = true;}
 
@@ -613,14 +629,15 @@ public class GLMModel extends Model<GLMModel,GLMModel.GLMParameters,GLMModel.GLM
     m._output._dinfo = DataInfo.makeEmpty(coefficients.length-1);
     m._output._domains = new String[predictors.length][];
     // double lambda , double [] beta, int iteration, double devTrain, double devTest
-    m.setSubmodel(new Submodel(0, coefficients, -1, Double.NaN, Double.NaN));
+    m.setSubmodel(new Submodel(0, coefficients, -1, Double.NaN, Double.NaN, Double.NaN));
     m._output.setSubmodelIdx(0);
     return m;
   }
 
   @Override public long checksum_impl(){
-    if(_parms._train == null) return 0;
-    return super.checksum_impl();
+    return hashCode();
+//    long res = _parms._train == null?Arrays.hashCode(_output._global_beta):super.checksum_impl();
+//    return res;
   }
 
   @Override

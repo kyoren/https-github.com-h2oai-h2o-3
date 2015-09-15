@@ -685,18 +685,62 @@ public class GLMTest  extends TestUtil {
     }
   }
 
+  @Test void testStandardizedProximal() {
+    Key parsed = Key.make("prostate_parsed");
+    Key modelKey = Key.make("prostate_model");
+    GLMModel model = null;
+
+    Frame fr = parse_test_file(parsed, "smalldata/logreg/prostate.csv");
+    fr.remove("ID").remove();
+    DKV.put(fr._key, fr);
+    Key betaConsKey = Key.make("beta_constraints");
+
+    FVecTest.makeByteVec(betaConsKey, "names, beta_given, rho\n AGE, 0.1, 1\n RACE, -0.1, 1 \n DPROS, 10, 1 \n DCAPS, -10, 1 \n PSA, 0, 1\n VOL, 0, 1\nGLEASON, 0, 1\n Intercept, 0, 0 \n");
+    Frame betaConstraints = ParseDataset.parse(Key.make("beta_constraints.hex"), betaConsKey);
+    try {
+      // H2O differs on intercept and race, same residual deviance though
+      GLMParameters params = new GLMParameters();
+      params._standardize = true;
+      params._family = Family.binomial;
+      params._beta_constraints = betaConstraints._key;
+      params._response_column = "CAPSULE";
+      params._ignored_columns = new String[]{"ID"};
+      params._train = fr._key;
+      params._alpha = new double[]{0};
+      params._lambda = new double[]{0};
+      GLM job = new GLM(modelKey, "glm test simple poisson", params);
+      job.trainModel().get();
+      model = DKV.get(modelKey).get();
+
+      double[] beta_1 = model._output.getNormBeta();
+      params._solver = Solver.L_BFGS;
+      params._max_iterations = 1000;
+      job = new GLM(modelKey, "glm test simple poisson", params);
+      job.trainModel().get();
+      model = DKV.get(modelKey).get();
+      fr.add("CAPSULE", fr.remove("CAPSULE"));
+      // now check the gradient
+      DataInfo dinfo = new DataInfo(Key.make(), fr, null, 1, true, TransformType.NONE, DataInfo.TransformType.NONE, true, false, false, false, false, false);
+      // todo: remove, result from h2o.1
+      // beta = new double[]{0.06644411112189823, -0.11172826074033719, 9.77360531534266, -9.972691681370678, 0.24664516432994327, -0.12369381230741447, 0.11330593275731994, -19.64465932744036};
+      LBFGS_LogisticGradientTask lt = (LBFGS_LogisticGradientTask) new LBFGS_LogisticGradientTask(dinfo, params, 0, beta_1, 1.0 / 380.0, null).doAll(dinfo._adaptedFrame);
+      new GLMGradientTask(dinfo, params, 0, beta_1, 1.0 / 380, null).doAll(dinfo._adaptedFrame);
+      double[] grad = lt._gradient;
+      for (int i = 0; i < beta_1.length; ++i)
+        assertEquals(0, grad[i] + betaConstraints.vec("rho").at(i) * (beta_1[i] - betaConstraints.vec("beta_given").at(i)), 1e-4);
+    } finally {
+      for (Vec v : betaConstraints.vecs())
+        v.remove();
+      DKV.remove(betaConstraints._key);
+      for (Vec v : fr.vecs()) v.remove();
+      DKV.remove(fr._key);
+      if (model != null) model.delete();
+    }
+  }
+
 
   @Test
   public void testProximal() {
-//    glmnet's result:
-//    res2 <- glmnet(x=M,y=D$CAPSULE,lower.limits=-.5,upper.limits=.5,family='binomial')
-//    res2$beta[,58]
-//    AGE        RACE          DPROS       PSA         VOL         GLEASON
-//    -0.00616326 -0.50000000  0.50000000  0.03628192 -0.01249324  0.50000000 //    res2$a0[100]
-//    res2$a0[58]
-//    s57
-//    -4.155864
-//    lambda = 0.001108, null dev =  512.2888, res dev = 379.7597
     Key parsed = Key.make("prostate_parsed");
     Key modelKey = Key.make("prostate_model");
     GLMModel model = null;

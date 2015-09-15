@@ -41,13 +41,13 @@ public abstract class GLMTask  {
    final int _nums; // number of numeric columns
    final int _numOff;
 
-   final boolean _comupteWeightedSigma = true;
+   final boolean _computeWeightedSigma;
 
    double [] _xsum; // weighted sum of x
    double [] _xxsum; // weighted sum of x^2
 
 
-   public YMUTask(DataInfo dinfo, Vec mVec, H2OCountedCompleter cmp){
+   public YMUTask(DataInfo dinfo, Vec mVec, boolean updateStd, H2OCountedCompleter cmp){
      super(cmp);
      _fVec = mVec;
      _nums = dinfo._nums;
@@ -55,7 +55,8 @@ public abstract class GLMTask  {
      _responseId = dinfo.responseChunkId();
      _weightId = dinfo._weights?dinfo.weightChunkId():-1;
      _offsetId = dinfo._offset?dinfo.offsetChunkId():-1;
-//     _comupteWeightedSigma = dinfo._weights && dinfo._predictor_transform.isSigmaScaled() ||  dinfo._predictor_transform.isMeanAdjusted();
+     _computeWeightedSigma = updateStd;
+//     _computeWeightedSigma = dinfo._weights && dinfo._predictor_transform.isSigmaScaled() ||  dinfo._predictor_transform.isMeanAdjusted();
    }
 
    @Override public void setupLocal(){_fVec.preWriting();}
@@ -78,7 +79,7 @@ public abstract class GLMTask  {
          skip[r] |= chunks[i].isNA(r);
      Chunk response = chunks[_responseId];
      Chunk weight = _weightId >= 0?chunks[_weightId]:new C0DChunk(1,chunks[0]._len);
-     if(_comupteWeightedSigma) {
+     if(_computeWeightedSigma) {
        _xsum = MemoryManager.malloc8d(_nums);
        _xxsum = MemoryManager.malloc8d(_nums);
      }
@@ -89,7 +90,7 @@ public abstract class GLMTask  {
          skip[r] = true;
          continue;
        }
-       if(_comupteWeightedSigma) {
+       if(_computeWeightedSigma) {
          for(int i = 0; i < _nums; ++i) {
            double d = chunks[i+_numOff].atd(r);
            _xsum[i]  += w*d;
@@ -125,7 +126,7 @@ public abstract class GLMTask  {
          _yMin = ymt._yMin;
        if(_yMax < ymt._yMax)
          _yMax = ymt._yMax;
-       if(_comupteWeightedSigma) {
+       if(_computeWeightedSigma) {
          ArrayUtils.add(_xsum, ymt._xsum);
          ArrayUtils.add(_xxsum, ymt._xxsum);
        }
@@ -438,7 +439,7 @@ public abstract class GLMTask  {
         for(int r = 0; r < c._len; ++r) { // categoricals can not be sparse
           if(skp[r]) continue;
           int off = _dinfo.getCategoricalId(i,(int)chks[i].at8(r));
-          if(off != -1)
+          if(off >= 0) // ignore unknown levels
             g[off] += eta[r];
         }
       }

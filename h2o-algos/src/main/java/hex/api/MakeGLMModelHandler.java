@@ -4,11 +4,13 @@ import hex.DataInfo;
 import hex.DataInfo.TransformType;
 import hex.glm.GLMModel;
 import hex.glm.GLMModel.GLMOutput;
+import hex.glm.GLMModel.GLMParameters;
 import hex.schemas.GLMModelV3;
 import hex.schemas.MakeGLMModelV3;
 import water.DKV;
 import water.Key;
 import water.api.Handler;
+import water.util.Log;
 
 import java.util.Map;
 
@@ -27,7 +29,11 @@ public class MakeGLMModelHandler extends Handler {
     double [] beta = model.beta().clone();
     for(int i = 0; i < beta.length; ++i)
       beta[i] = coefs.get(names[i]);
-    GLMModel m = new GLMModel(args.dest != null?args.dest.key():Key.make(),model._parms,null, Double.NaN, Double.NaN, Double.NaN, -1, false, false);
+    GLMParameters parms = (GLMParameters) model._parms.clone();
+    parms._train = null;
+    GLMModel m = new GLMModel(args.dest != null?args.dest.key():Key.make(),parms,null, model._ymu, model._ySigma, model._lambda_max, -1, false, false);
+    m._output._model_metrics = new Key[0];
+    Log.info("made new model with checksum = " + m.checksum());
     DataInfo dinfo = model.dinfo();
     dinfo.setPredictorTransform(TransformType.NONE);
     // GLMOutput(DataInfo dinfo, String[] column_names, String[][] domains, String[] coefficient_names, boolean binomial) {

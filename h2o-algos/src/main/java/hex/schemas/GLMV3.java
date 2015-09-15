@@ -55,6 +55,7 @@ public class GLMV3 extends ModelBuilderSchema<GLM,GLMV3,GLMV3.GLMParametersV3> {
             "max_after_balance_size",
             "max_confusion_matrix_size",
             "max_hit_ratio_k",
+            "obj_reg",
     };
 
     // Input fields
@@ -159,6 +160,9 @@ public class GLMV3 extends ModelBuilderSchema<GLM,GLMV3,GLMV3.GLMParametersV3> {
      */
     @API(help = "Max. number (top K) of predictions to use for hit ratio computation (for multi-class only, 0 to disable)", level = API.Level.secondary, direction=API.Direction.INOUT)
     public int max_hit_ratio_k;
+
+    @API(help = "Regularization of the objective", level = Level.expert, direction= Direction.INPUT)
+    public double obj_reg;
 
     /////////////////////
 
