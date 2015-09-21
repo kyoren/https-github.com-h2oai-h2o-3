@@ -1,8 +1,11 @@
-# TO DO: After grid is implemented in Python, add this...
-
-# model_chkp <- h2o.deeplearning(x = train.names[0:784], 
-#                           y = train.names[785], 
-#                           training_frame = train, 
-#                           checkpoint = grid@model[[1]],  #need to udpate
-#                           validation_frame = test,
-#                           epochs = 9)
+# Re-start the training process on a saved DL model
+# using the `checkpoint` argument
+model_chkp = h2o.deeplearning(x=x,
+                              y=y,
+                              training_frame=train,
+                              validation_frame=test,
+                              checkpoint=model,
+                              distribution="multinomial",
+                              activation="RectifierWithDropout",
+                              hidden=[200,200,200],
+                              epochs=10)

@@ -143,7 +143,7 @@ public class Frame extends Lockable<Frame> {
     catch( NumberFormatException fe ) { }
     return 0;
   }
-  private String uniquify( String name ) {
+  public String uniquify( String name ) {
     String n = name;
     int lastName = 0;
     if( name.length() > 0 && name.charAt(0)=='C' )
@@ -365,7 +365,7 @@ public class Frame extends Lockable<Frame> {
   }
 
   /** Type for every Vec */
-  byte[] types() {
+  public byte[] types() {
     Vec[] vecs = vecs();
     byte bs[] = new byte[vecs.length];
     for( int i=0; i<vecs.length; i++ )
@@ -393,10 +393,29 @@ public class Frame extends Lockable<Frame> {
     return card;
   }
 
+  private Vec[] bulkRollups() {
+    Futures fs = new Futures();
+    Vec[] vecs = vecs();
+    for(Vec v : vecs)  v.startRollupStats(fs);
+    fs.blockForPending();
+    return vecs;
+  }
+
+  /** Majority class for enum columns; -1 for non-enum columns.
+   * @return the majority class for enum columns */
+  public int[] modes() {
+    Vec[] vecs = bulkRollups();
+    int[] modes = new int[vecs.length];
+    for( int i = 0; i < vecs.length; i++ ) {
+      modes[i] = vecs[i].isEnum() ? vecs[i].mode() : -1;
+    }
+    return modes;
+  }
+
   /** All the column means.
    *  @return the mean of each column */
   public double[] means() {
-    Vec[] vecs = vecs();
+    Vec[] vecs = bulkRollups();
     double[] means = new double[vecs.length];
     for( int i = 0; i < vecs.length; i++ )
       means[i] = vecs[i].mean();
@@ -406,7 +425,7 @@ public class Frame extends Lockable<Frame> {
   /** One over the standard deviation of each column.
    *  @return Reciprocal the standard deviation of each column */
   public double[] mults() {
-    Vec[] vecs = vecs();
+    Vec[] vecs = bulkRollups();
     double[] mults = new double[vecs.length];
     for( int i = 0; i < vecs.length; i++ ) {
       double sigma = vecs[i].sigma();
@@ -423,8 +442,8 @@ public class Frame extends Lockable<Frame> {
   /** The {@code Vec.byteSize} of all Vecs
    *  @return the {@code Vec.byteSize} of all Vecs */
   public long byteSize() {
+    Vec[] vecs = bulkRollups();
     long sum=0;
-    Vec[] vecs = vecs();
     for (Vec vec : vecs) sum += vec.byteSize();
     return sum;
   }
@@ -843,7 +862,7 @@ public class Frame extends Lockable<Frame> {
       if (n > MAX_EQ2_COLS)
         throw new IllegalArgumentException("Too many requested columns (requested " + n +", max " + MAX_EQ2_COLS + ")");
       cols = new long[(int)n];
-      Vec v = fr.anyVec();
+      Vec.Reader v = fr.anyVec().new Reader();
       for (long i = 0; i < v.length(); i++)
         cols[(int)i] = v.at8(i);
     } else

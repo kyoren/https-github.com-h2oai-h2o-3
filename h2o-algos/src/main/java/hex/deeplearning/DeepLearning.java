@@ -157,6 +157,7 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
   }
 
   public class DeepLearningDriver extends H2O.H2OCountedCompleter<DeepLearningDriver> {
+    protected DeepLearningDriver() { super(true); } // bump priority of drivers
     @Override protected void compute2() {
       try {
         long cs = _parms.checksum();
@@ -223,7 +224,7 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
           cp.write_lock(self());
 
           if (!Arrays.equals(cp._output._names, previous._output._names)) {
-            throw new IllegalArgumentException("Number of (non-constant) predictor columns of the training data must be the same as for the checkpointed model. Check ignored columns (or disable ignore_const_cols).");
+            throw new IllegalArgumentException("The columns of the training data must be the same as for the checkpointed model. Check ignored columns (or disable ignore_const_cols).");
           }
           if (!Arrays.deepEquals(cp._output._domains, previous._output._domains)) {
             throw new IllegalArgumentException("Categorical factor levels of the training data must be the same as for the checkpointed model.");
@@ -297,8 +298,11 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
         model.write_lock(self());
         new ProgressUpdate("Setting up training data...").fork(_progressKey);
         final DeepLearningParameters mp = model.model_info().get_params();
-        Frame tra_fr = new Frame(Key.make(mp.train()._key.toString()), _train.names(), _train.vecs());
-        Frame val_fr = _valid != null ? new Frame(Key.make(mp.valid()._key.toString()), _valid.names(), _valid.vecs()) : null;
+
+        // temporary frames of the same "name" as the orig _train/_valid (asking the parameter's Key, not the actual frame)
+        // Note: don't put into DKV or they would overwrite the _train/_valid frames!
+        Frame tra_fr = new Frame(mp._train, _train.names(), _train.vecs());
+        Frame val_fr = _valid != null ? new Frame(mp._valid,_valid.names(), _valid.vecs()) : null;
 
         train = tra_fr;
         if (mp._force_load_balance) {
@@ -322,6 +326,7 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
         }
         model.training_rows = train.numRows();
         trainScoreFrame = sampleFrame(train, mp._score_training_samples, mp._seed); //training scoring dataset is always sampled uniformly from the training dataset
+        if( trainScoreFrame != train ) _delete_me.add(trainScoreFrame);
 
         if (!_parms._quiet_mode) Log.info("Number of chunks of the training data: " + train.anyVec().nChunks());
         if (val_fr != null) {
@@ -334,6 +339,7 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
           } else {
             new ProgressUpdate("Sampling validation data...").fork(_progressKey);
             validScoreFrame = sampleFrame(val_fr, mp._score_validation_samples, mp._seed +1);
+            if( validScoreFrame != val_fr ) _delete_me.add(validScoreFrame);
           }
           if (mp._force_load_balance) {
             new ProgressUpdate("Balancing class distribution of validation data...").fork(_progressKey);
@@ -367,14 +373,14 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
         new ProgressUpdate("Training...").fork(_progressKey);
 
         //main loop
-        int iteration = 0;
+        int iteration = 1;
         do {
           model.set_model_info(mp._epochs == 0 ? model.model_info() : H2O.CLOUD.size() > 1 && mp._replicate_training_data ? (mp._single_node_mode ?
-                  new DeepLearningTask2(self(), train, model.model_info(), rowFraction(train, mp, model), ++iteration).doAll(Key.make(H2O.SELF)).model_info() : //replicated data + single node mode
-                  new DeepLearningTask2(self(), train, model.model_info(), rowFraction(train, mp, model), ++iteration).doAllNodes(             ).model_info()): //replicated data + multi-node mode
-                  new DeepLearningTask (self(),        model.model_info(), rowFraction(train, mp, model), ++iteration).doAll     (    train    ).model_info()); //distributed data (always in multi-node mode)
+                  new DeepLearningTask2(self(), train, model.model_info(), rowFraction(train, mp, model), iteration).doAll(Key.make(H2O.SELF)).model_info() : //replicated data + single node mode
+                  new DeepLearningTask2(self(), train, model.model_info(), rowFraction(train, mp, model), iteration).doAllNodes(             ).model_info()): //replicated data + multi-node mode
+                  new DeepLearningTask (self(),        model.model_info(), rowFraction(train, mp, model), iteration).doAll     (    train    ).model_info()); //distributed data (always in multi-node mode)
         }
-        while (isRunning() && model.doScoring(trainScoreFrame, validScoreFrame, self(), _progressKey, iteration));
+        while (isRunning() && model.doScoring(trainScoreFrame, validScoreFrame, self(), _progressKey, iteration++));
 
         // replace the model with the best model so far (if it's better)
         if (isRunning() && _parms._overwrite_with_best_model && model.actual_best_model_key != null && _parms._nfolds == 0) {
@@ -389,7 +395,7 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
             mi.set_processed_local(model.model_info().get_processed_local());
             model.set_model_info(mi);
             model.update(self());
-            model.doScoring(trainScoreFrame, validScoreFrame, self(), _progressKey, -1);
+            model.doScoring(trainScoreFrame, validScoreFrame, self(), _progressKey, iteration);
             assert(best_model.error() == model.error());
           }
         }
