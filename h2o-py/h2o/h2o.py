@@ -1,6 +1,7 @@
 import warnings
 warnings.simplefilter('always', DeprecationWarning)
 import os
+import itertools
 import functools
 import os.path
 import re
@@ -11,7 +12,7 @@ import tabulate
 from connection import H2OConnection
 from job import H2OJob
 from expr import ExprNode
-from frame import H2OFrame, _py_tmp_key
+from frame import H2OFrame, _py_tmp_key, _is_list_of_lists
 from model import H2OBinomialModel,H2OAutoEncoderModel,H2OClusteringModel,H2OMultinomialModel,H2ORegressionModel
 import h2o_model_builder
 
@@ -172,7 +173,10 @@ def parse(setup, h2o_name, first_line_is_header=(-1, 0, 1)):
     p["column_types"] = None
 
   if setup["na_strings"]:
-    setup["na_strings"] = [[_quoted(na) for na in col] if col is not None else [] for col in setup["na_strings"]]
+    if _is_list_of_lists(setup["na_strings"]): setup["na_strings"] = [[_quoted(na) for na in col] if col is not None else [] for col in setup["na_strings"]]
+    else:
+      setup["na_strings"] = [_quoted(na) for na in setup["na_strings"]] # quote the strings
+      setup["na_strings"] = '\"' + str(list(itertools.repeat(setup["na_strings"], len(setup["column_types"])))) + '\"'
     p["na_strings"] = None
 
 
@@ -222,7 +226,7 @@ def _quoted(key, replace=True):
   key = key.replace("%", ".")
   key = key.replace("&", ".")
   is_quoted = len(re.findall(r'\"(.+?)\"', key)) != 0
-  key = key if is_quoted  else "\"" + key + "\""
+  key = key if is_quoted  else '"' + key + '"'
   return key
 
 def assign(data,id):
@@ -1030,7 +1034,7 @@ def gbm(x,y,validation_x=None,validation_y=None,training_frame=None,model_id=Non
   balance_classes : bool
     logical, indicates whether or not to balance training data class counts via over/under-sampling (for imbalanced data)
   max_after_balance_size : float
-    Maximum relative size of the training data after balancing class counts (can be less than 1.0)
+    Maximum relative size of the training data after balancing class counts (can be less than 1.0). Ignored if balance_classes is False, which is the default behavior.
   seed : int
     Seed for random numbers (affects sampling when balance_classes=T)
   build_tree_one_node : bool
@@ -1261,7 +1265,7 @@ def random_forest(x,y,validation_x=None,validation_y=None,training_frame=None,mo
   balance_classes : bool
     logical, indicates whether or not to balance training data class counts via over/under-sampling (for imbalanced data)
   max_after_balance_size : float
-    Maximum relative size of the training data after balancing class counts (can be less than 1.0)
+    Maximum relative size of the training data after balancing class counts (can be less than 1.0). Ignored if balance_classes is False, which is the default behavior.
   seed : int
     Seed for random numbers (affects sampling) - Note: only reproducible when running single threaded
   offset_column : H2OFrame

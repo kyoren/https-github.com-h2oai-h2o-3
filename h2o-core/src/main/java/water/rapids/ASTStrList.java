@@ -4,7 +4,6 @@ import water.DKV;
 import water.H2O;
 import water.fvec.Frame;
 import water.fvec.Vec;
-import water.util.SB;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,7 +12,7 @@ import java.util.Arrays;
  *  executes and never gets on the execution stack.
  */
 public class ASTStrList extends ASTParameter {
-  String[] _strs;
+  public String[] _strs;
   ASTStrList( Exec e ) {
     ArrayList<String> strs  = new ArrayList<>();
     while( true ) {
@@ -31,15 +30,14 @@ public class ASTStrList extends ASTParameter {
   // the execution stack
   @Override public Val exec(Env env) { throw H2O.fail(); }
   @Override public String str() { return Arrays.toString(_strs); }
-  @Override public String toJavaString() {
-    if( _strs==null || _strs.length==0 ) return "\"null\"";
-    SB sb = new SB();
-    for(int i=0;i<_strs.length;++i) {
-      sb.p("\"").p(_strs[i]).p("\"");
-      if( i==_strs.length-1) return sb.toString();
-      sb.p(',');
+  // Select columns by number or String.
+  @Override int[] columns( String[] names ) { 
+    int[] idxs = new int[_strs.length];
+    for( int i=0; i < _strs.length; i++ ) {
+      int idx = idxs[i] = water.util.ArrayUtils.find(names,_strs[i]);
+      if( idx == -1 ) throw new IllegalArgumentException("Column "+_strs[i]+" not found");
     }
-    throw new RuntimeException("Should never be here");
+    return idxs;
   }
 }
 

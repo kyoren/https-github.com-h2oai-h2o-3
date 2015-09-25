@@ -749,8 +749,10 @@ h2o.anyFactor <- function(x) .newExpr("any.factor", chk.Frame(x))
   if( is.numeric(sel) ) { # number list for column selection; zero based
     sel2 <- lapply(sel,function(x) if( x==0 ) stop("Cannot select row or column 0") else if( x > 0 ) x-1 else x)
     .num.list(sel2)
-  } else if( is.null(sel) ) "[]"  # Empty selector
-  else as.character(sel)
+  } else {
+    if( is.null(sel) ) "[]" # Empty selector
+    else as.character(sel)
+  }
 }
 
 #' Extract or Replace Parts of an Frame Object
@@ -799,8 +801,7 @@ NULL
   }
   if( !missing(col) ) {     # Have a column selector?
     if( is.logical(col) ) { # Columns by boolean choice
-      print(col)
-      stop("unimplemented1")
+      col <- which(col)     # Pick out all the TRUE columns by index
     } else if( is.character(col) ) { # Columns by name
       assign("idx", match(col,colnames(data))) # Match on name
       if( any(is.na(idx)) ) stop(paste0("No column '",col,"' found in ",paste(colnames(data),collapse=",")))
@@ -924,6 +925,7 @@ pfr <- function(x) { chk.Frame(x); .pfr(x) }
     }
     # Now clear all internal DAG nodes, allowing GC to reclaim them
     .clear.impl(x)
+    .fetch.data(x,1) #trigger a cache update if needed
     # Enable this GC to trigger rapid R GC cycles, and rapid R clearing of
     # temps... to help debug GC issues.
     #.h2o.gc()
@@ -1102,7 +1104,7 @@ h2o.head <- function(x, ..., n=6L) {
   if( n >= 0L && n <= 1000L ) # Short version, just report the cached internal DF
     head(.fetch.data(x,n),n)
   else # Long version, fetch all asked for "the hard way"
-    .newExpr("rows",x,paste0("[0:",n,"]"))
+    as.data.frame(.newExpr("rows",x,paste0("[0:",n,"]")))
 }
 
 #' @rdname h2o.head
@@ -1117,7 +1119,7 @@ h2o.tail <- function(x, ..., n=6L) {
   if( n==0L ) head(x,n=0L)
   else {
     startidx <- max(1L, endidx - n + 1)
-    .newExpr("rows",x,paste0("[",startidx-1,":",(endidx-startidx+1),"]"))
+    as.data.frame(.newExpr("rows",x,paste0("[",startidx-1,":",(endidx-startidx+1),"]")))
   }
 }
 
@@ -1154,7 +1156,7 @@ is.numeric <- function(x) {
 #' @param x An H2O Frame object
 #' @param ... Further arguments to be passed from or to other methods.
 #' @export
-print.Frame <- function(x, ...) { cat(as.character(x)); invisible(x) }
+print.Frame <- function(x, ...) { print(head(x)) }
 
 #' Display the structure of an H2O Frame object
 #'
@@ -1479,8 +1481,8 @@ h2o.summary <- function(object, factors=6L, ...) {
       result <- as.table(as.matrix(cols))
     }
   }
+  if( is.null(result) || dim(result) == 0 ) return(NULL)
   colnames(result) <- cnames
-  if( is.null(result) ) return(NULL)
   rownames(result) <- rep("", nrow(result))
   result
 }
@@ -1706,10 +1708,19 @@ as.data.frame.Frame <- function(x, ...) {
     ttt <- ttt2
   }
 
+  # Get column types from H2O to set the dataframe types correctly
+  colClasses <- attr(x, "types")
+  colClasses <- gsub("numeric", NA, colClasses) # let R guess the appropriate numeric type
+  colClasses <- gsub("int", NA, colClasses) # let R guess the appropriate numeric type
+  colClasses <- gsub("real", NA, colClasses) # let R guess the appropriate numeric type
+  colClasses <- gsub("enum", "factor", colClasses)
+  colClasses <- gsub("uuid", "character", colClasses)
+  colClasses <- gsub("string", "character", colClasses)
+  colClasses <- gsub("time", NA, colClasses) # change to Date after ingestion
   # Substitute NAs for blank cells rather than skipping
-  df <- read.csv((tcon <- textConnection(ttt)), blank.lines.skip = FALSE, na.strings = "", ...)
-  # df <- read.csv(textConnection(ttt), blank.lines.skip = FALSE, colClasses = colClasses, ...)
+  df <- read.csv((tcon <- textConnection(ttt)), blank.lines.skip = FALSE, na.strings = "", colClasses = colClasses, ...)
   close(tcon)
+  # FIXME now convert all date columns to POSIXct
   df
 }
 
@@ -1785,16 +1796,8 @@ as.factor <- function(x) {
 #' @param ... Further arguments to be passed from or to other methods.
 #' @export
 as.character.Frame <- function(x, ...) {
-  data <- .fetch.data(x,10L)
-  if( !is.data.frame(data) ) return(as.character(data))
-  nr <- nrow(x)
-  nc <- ncol(x)
-  if( nr==1L && nc==1L ) return(as.character(data[1,1]))
-  res <- paste0("Frame with ",
-      nr, ifelse(nr == 1L, " row and ", " rows and "),
-      nc, ifelse(nc == 1L, " column\n", " columns\n"), collapse="")
-  if( nr > 10L ) res <- paste0(res,"\nFirst 10 rows:\n")
-  paste0(res,paste0(head(data, 10L),collapse="\n"),"\n")
+  if( is.Frame(x) ) .newExpr("as.character",x)
+  else base::as.character(x)
 }
 
 #' Convert H2O Data to Numeric
@@ -1961,7 +1964,7 @@ h2o.rbind <- function(...) {
 #' r.hex <- as.h2o(right)
 #' left.hex <- h2o.merge(l.hex, r.hex, all.x = TRUE)
 #' @export
-h2o.merge <- function(x, y, all.x = FALSE, all.y = FALSE) .newExpr("merge", x, y, all.x, all.y)
+h2o.merge <- function(x, y, all.x = TRUE, all.y = FALSE) .newExpr("merge", x, y, all.x, all.y)
 
 #' Group and Apply by Column
 #'

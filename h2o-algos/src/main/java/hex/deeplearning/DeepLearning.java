@@ -53,7 +53,7 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
   /** Start the DeepLearning training Job on an F/J thread.
    * @param work
    * @param restartTimer*/
-  @Override public Job<DeepLearningModel> trainModelImpl(long work, boolean restartTimer) {
+  @Override protected Job<DeepLearningModel> trainModelImpl(long work, boolean restartTimer) {
     // We look at _train before init(true) is called, so step around that here:
     return start(new DeepLearningDriver(), work, restartTimer);
   }
@@ -213,9 +213,14 @@ public class DeepLearning extends ModelBuilder<DeepLearningModel,DeepLearningPar
           throw new IllegalArgumentException("Model type must be the same as for the checkpointed model.");
 
         // check the user-given arguments for consistency
-        DeepLearningParameters oldP = previous._parms; //user-given parameters for checkpointed model
+        DeepLearningParameters oldP = previous._parms; //sanitized parameters for checkpointed model
         DeepLearningParameters newP = _parms; //user-given parameters for restart
-        DeepLearningParameters.Sanity.checkpoint(oldP, newP);
+
+        DeepLearningParameters oldP2 = (DeepLearningParameters)oldP.clone();
+        DeepLearningParameters newP2 = (DeepLearningParameters)newP.clone();
+        DeepLearningParameters.Sanity.modifyParms(oldP, oldP2, nclasses()); //sanitize the user-given parameters
+        DeepLearningParameters.Sanity.modifyParms(newP, newP2, nclasses()); //sanitize the user-given parameters
+        DeepLearningParameters.Sanity.checkpoint(oldP2, newP2);
 
         try {
           final DataInfo dinfo = makeDataInfo(_train, _valid, _parms);

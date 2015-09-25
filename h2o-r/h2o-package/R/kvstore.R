@@ -36,7 +36,7 @@
       else  sapply(c$string_data, function(str) { if(is.null(str)) NA_character_ else str }); 
     })
     # Pad out to same length (square up ragged data), and convert to data.frame
-    maxlen <- max(sapply(L,length))
+    if( length(L) > 0 ) maxlen <- max(sapply(L,length)) else 0
     data <- do.call(data.frame,lapply(L,function(row) c(row,rep(NA,maxlen-length(row)))))
     # Zero rows?  Then force a zero-length full width data.frame
     if( length(data)==0 ) data <- as.data.frame(matrix(NA,ncol=length(res$columns),nrow=0L))
@@ -51,6 +51,7 @@
       }
     }
     .set(x,"data",data)
+    .set(x,"types",lapply(res$columns, function(c) c$type))
     .set(x,"nrow",res$rows)
   }
   attr(x,"data")
@@ -58,8 +59,9 @@
 
 #` Flush any cached data
 .flush.data <- function(x) {
-  rm("data",envir=x);
-  rm("nrow",envir=x);
+  rm("data",envir=x)
+  rm("types",envir=x)
+  rm("nrow",envir=x)
   x
 }
 
@@ -80,7 +82,7 @@
 #' @export
 h2o.ls <- function() {
   .h2o.gc()
-  .fetch.data(.newExpr("ls"),10L)
+  as.data.frame(.eval.frame(.newExpr("ls")))
 }
 
 #'

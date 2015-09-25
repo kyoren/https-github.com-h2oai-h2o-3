@@ -1761,6 +1761,41 @@ setMethod("h2o.confusionMatrix", "H2OModelMetrics", function(object, thresholds=
   m
 })
 
+#' Plot an H2O Model
+#'
+#' Plots training set (and validation set if available) scoring history for an H2O Model
+#'
+#' This method dispatches on the type of H2O model to select the correct
+#' scoring history.  The \code{timestep} and \code{metric} arguments are restricted to what is 
+#' available in the scoring history for a particular type of model.
+#'
+#' @param x A fitted \linkS4class{H2OModel} object for which the scoring history plot is desired.
+#' @param timestep A unit of measurement for the x-axis.
+#' @param metric A unit of measurement for the y-axis.
+#' @param ... additional arguments to pass on.
+#' @return Returns a scoring history plot.
+#' @seealso \code{link{h2o.deeplearning}}, \code{link{h2o.gbm}},
+#'          \code{link{h2o.glm}}, \code{link{h2o.randomForest}} for model
+#'          generation in h2o.
+#' @examples
+#' \donttest{
+#' library(h2o)
+#' library(mlbench)
+#' h2o.init()
+#' 
+#' df <- as.h2o(mlbench::mlbench.friedman1(10000,1))
+#' rng <- h2o.runif(df, seed=1234)
+#' train <- df[rng<0.8,]
+#' valid <- df[rng>=0.8,]
+#' 
+#' gbm <- h2o.gbm(x = 1:10, y = "y", training_frame = train, validation_frame = valid, 
+#'   ntrees=500, learn_rate=0.01, score_each_iteration = TRUE)
+#' plot(gbm)
+#' plot(gbm, timestep = "duration", metric = "deviance")
+#' plot(gbm, timestep = "number_of_trees", metric = "deviance")
+#' plot(gbm, timestep = "number_of_trees", metric = "MSE")
+#' 
+#' }          
 #' @export
 plot.H2OModel <- function(x, timestep = "AUTO", metric = "AUTO", ...) {
   df <- as.data.frame(x@model$scoring_history)
@@ -1820,17 +1855,25 @@ plot.H2OModel <- function(x, timestep = "AUTO", metric = "AUTO", ...) {
     training_metric <- sprintf("training_%s", metric)
     validation_metric <- sprintf("validation_%s", metric)
     if (timestep == "duration") {
-      tt <- trimws(df[2, c("duration")])
+      trim <- function (ss) gsub("^\\s+|\\s+$", "", ss)
+      tt <- trim(df[2, c("duration")])  #base::trimws not implemented for earlier versions of R, so we make our own trim function
       dur_colname <- sprintf("duration_%s", strsplit(tt, " ")[[1]][2]) #parse units of measurement
-      df[,c(dur_colname)] <- apply(as.matrix(df[,c("duration")]), 1, function(v) as.numeric(strsplit(trimws(v), " ")[[1]][1]))
+      df[,c(dur_colname)] <- apply(as.matrix(df[,c("duration")]), 1, function(v) as.numeric(strsplit(trim(v), " ")[[1]][1]))
       timestep <- dur_colname
     }
-    ylim <- range(c(df[,c(training_metric)], df[,c(validation_metric)]))  #sync up y axes
-    graphics::plot(df[,c(timestep)], df[,c(training_metric)], type="l", xlab = "", ylab = "", axes = FALSE,
-         main = "Scoring History", col = "blue", ylim = ylim)
-    graphics::par(new = TRUE)
-    graphics::plot(df[,c(timestep)], df[,c(validation_metric)], type="l", xlab = timestep, ylab = metric, col = "orange", ylim = ylim)
-    graphics::legend("topright", legend = c("Training", "Validation"), col = c("blue", "orange"), lty = c(1,1))
+    if (validation_metric %in% names(df)) {  #Training and Validation scoring history
+      ylim <- range(c(df[,c(training_metric)], df[,c(validation_metric)]))  #sync up y axes
+      graphics::plot(df[,c(timestep)], df[,c(training_metric)], type="l", xlab = "", ylab = "", axes = FALSE,
+                     main = "Scoring History", col = "blue", ylim = ylim)
+      graphics::par(new = TRUE)
+      graphics::plot(df[,c(timestep)], df[,c(validation_metric)], type="l", xlab = timestep, ylab = metric, col = "orange", ylim = ylim)
+      graphics::legend("topright", legend = c("Training", "Validation"), col = c("blue", "orange"), lty = c(1,1))
+    } else {  #Training scoring history only
+      ylim <- range(c(df[,c(training_metric)]))
+      graphics::plot(df[,c(timestep)], df[,c(training_metric)], type="l", xlab = timestep, ylab = training_metric,
+                     main = "Training Scoring History", col = "blue", ylim = ylim)
+      
+    }
   }
 }
 
