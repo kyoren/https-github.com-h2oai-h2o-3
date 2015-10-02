@@ -410,7 +410,7 @@ public class DeepLearningTest extends TestUtil {
           @Override
           int prep(Frame fr) {
             Vec resp = fr.remove("C2");
-            fr.add("C2", resp.toEnum());
+            fr.add("C2", resp.toCategorical());
             resp.remove();
             return fr.find("C3");
           }
@@ -434,7 +434,7 @@ public class DeepLearningTest extends TestUtil {
     Vec ret = null;
     if (classification) {
       ret = fr.remove(idx);
-      fr.add(rname,resp.toEnum());
+      fr.add(rname,resp.toCategorical());
     } else {
       fr.remove(idx);
       fr.add(rname,resp);
@@ -536,7 +536,7 @@ public class DeepLearningTest extends TestUtil {
     try {
       for (int i = 0; i < N; ++i) {
         frTrain = parse_test_file("./smalldata/covtype/covtype.20k.data");
-        Vec resp = frTrain.lastVec().toEnum();
+        Vec resp = frTrain.lastVec().toCategorical();
         frTrain.remove(frTrain.vecs().length - 1).remove();
         frTrain.add("Response", resp);
         DKV.put(frTrain);
@@ -600,12 +600,12 @@ public class DeepLearningTest extends TestUtil {
     boolean covtype = true;
     if (covtype) {
       frTrain = parse_test_file("./smalldata/covtype/covtype.20k.data");
-      Vec resp = frTrain.lastVec().toEnum();
+      Vec resp = frTrain.lastVec().toCategorical();
       frTrain.remove(frTrain.vecs().length - 1).remove();
       frTrain.add("Response", resp);
     } else {
       frTrain = parse_test_file("./bigdata/server/HIGGS.csv");
-      Vec resp = frTrain.vecs()[0].toEnum();
+      Vec resp = frTrain.vecs()[0].toCategorical();
       frTrain.remove(0).remove();
       frTrain.prepend("Response", resp);
     }
@@ -668,7 +668,7 @@ public class DeepLearningTest extends TestUtil {
 
   @Test
   public void testNoRowWeights() {
-    Frame tfr = null, vfr = null;
+    Frame tfr = null, vfr = null, pred = null, fr2 = null;
 
     Scope.enter();
     try {
@@ -688,26 +688,28 @@ public class DeepLearningTest extends TestUtil {
       DeepLearning job = new DeepLearning(parms);
       DeepLearningModel dl = job.trainModel().get();
 
-      dl.score(parms.train());
+      pred = dl.score(parms.train());
       hex.ModelMetricsBinomial mm = hex.ModelMetricsBinomial.getFromDKV(dl, parms.train());
       assertEquals(0.7592592592592592, mm.auc()._auc, 1e-8);
 
       double mse = dl._output._training_metrics.mse();
       assertEquals(0.31481334186707816, mse, 1e-8);
 
-      assertTrue(dl.testJavaScoring(tfr, dl.score(tfr), 1e-5));
+      assertTrue(dl.testJavaScoring(tfr, fr2=dl.score(tfr), 1e-5));
       job.remove();
       dl.delete();
     } finally {
       if (tfr != null) tfr.remove();
       if (vfr != null) vfr.remove();
+      if (pred != null) pred.remove();
+      if (fr2 != null) fr2.remove();
     }
     Scope.exit();
   }
 
   @Test
   public void testRowWeightsOne() {
-    Frame tfr = null, vfr = null;
+    Frame tfr = null, vfr = null, pred = null, fr2 = null;
 
     Scope.enter();
     try {
@@ -728,26 +730,28 @@ public class DeepLearningTest extends TestUtil {
       DeepLearning job = new DeepLearning(parms);
       DeepLearningModel dl = job.trainModel().get();
 
-      dl.score(parms.train());
+      pred = dl.score(parms.train());
       hex.ModelMetricsBinomial mm = hex.ModelMetricsBinomial.getFromDKV(dl, parms.train());
       assertEquals(0.7222222222222222, mm.auc()._auc, 1e-8);
 
       double mse = dl._output._training_metrics.mse();
       assertEquals(0.31599425403539766, mse, 1e-8); //Note: better results than non-shuffled
 
-//      Assert.assertTrue(dl.testJavaScoring(tfr,dl.score(tfr),1e-5)); //PUBDEV-1900
+//      assertTrue(dl.testJavaScoring(tfr, fr2=dl.score(tfr, 1e-5)); //PUBDEV-1900
       job.remove();
       dl.delete();
     } finally {
       if (tfr != null) tfr.remove();
       if (vfr != null) vfr.remove();
+      if (pred != null) pred.remove();
+      if (fr2 != null) fr2.remove();
     }
     Scope.exit();
   }
 
   @Test
   public void testNoRowWeightsShuffled() {
-    Frame tfr = null, vfr = null;
+    Frame tfr = null, vfr = null, pred = null, fr2 = null;
 
     Scope.enter();
     try {
@@ -767,26 +771,28 @@ public class DeepLearningTest extends TestUtil {
       DeepLearning job = new DeepLearning(parms);
       DeepLearningModel dl = job.trainModel().get();
 
-      dl.score(parms.train());
+      pred = dl.score(parms.train());
       hex.ModelMetricsBinomial mm = hex.ModelMetricsBinomial.getFromDKV(dl, parms.train());
       assertEquals(0.7222222222222222, mm.auc()._auc, 1e-8);
 
       double mse = dl._output._training_metrics.mse();
       assertEquals(0.3164307133994674, mse, 1e-8);
 
-      assertTrue(dl.testJavaScoring(tfr, dl.score(tfr), 1e-5));
+      assertTrue(dl.testJavaScoring(tfr, fr2=dl.score(tfr), 1e-5));
       job.remove();
       dl.delete();
     } finally {
       if (tfr != null) tfr.remove();
       if (vfr != null) vfr.remove();
+      if (pred != null) pred.remove();
+      if (fr2 != null) fr2.remove();
     }
     Scope.exit();
   }
 
   @Test
   public void testRowWeights() {
-    Frame tfr = null, vfr = null;
+    Frame tfr = null, vfr = null, pred = null, fr2=null;
 
     Scope.enter();
     try {
@@ -807,19 +813,21 @@ public class DeepLearningTest extends TestUtil {
       DeepLearning job = new DeepLearning(parms);
       DeepLearningModel dl = job.trainModel().get();
 
-      dl.score(parms.train());
+      pred = dl.score(parms.train());
       hex.ModelMetricsBinomial mm = hex.ModelMetricsBinomial.getFromDKV(dl, parms.train());
       assertEquals(0.7777777777777778, mm.auc()._auc, 1e-8);
 
       double mse = dl._output._training_metrics.mse();
       assertEquals(0.32223485418125575, mse, 1e-8);
 
-//      Assert.assertTrue(dl.testJavaScoring(tfr,dl.score(tfr),1e-5)); //PUBDEV-1900
+//      Assert.assertTrue(dl.testJavaScoring(tfr,fr2=dl.score(tfr),1e-5)); //PUBDEV-1900
       job.remove();
       dl.delete();
     } finally {
       if (tfr != null) tfr.remove();
       if (vfr != null) vfr.remove();
+      if (pred != null) pred.remove();
+      if (fr2 != null) fr2.remove();
     }
     Scope.exit();
   }
@@ -834,7 +842,7 @@ public class DeepLearningTest extends TestUtil {
       Scope.enter();
       try {
         frTrain = parse_test_file("./smalldata/covtype/covtype.20k.data");
-        Vec resp = frTrain.lastVec().toEnum();
+        Vec resp = frTrain.lastVec().toCategorical();
         frTrain.remove(frTrain.vecs().length-1);
         frTrain.add("Response", resp);
         // Configure DL
@@ -871,12 +879,12 @@ public class DeepLearningTest extends TestUtil {
   // just a simple sanity check - not a golden test
   @Test
   public void testLossFunctions() {
-    Frame tfr = null, vfr = null;
+    Frame tfr = null, vfr = null, fr2 = null;
     DeepLearningModel dl = null;
 
     for (DeepLearningParameters.Loss loss: new DeepLearningParameters.Loss[]{
         DeepLearningParameters.Loss.Automatic,
-        DeepLearningParameters.Loss.MeanSquare,
+        DeepLearningParameters.Loss.Quadratic,
         DeepLearningParameters.Loss.Huber,
         DeepLearningParameters.Loss.Absolute,
     }) {
@@ -886,7 +894,7 @@ public class DeepLearningTest extends TestUtil {
         for (String s : new String[]{
             "Merit", "Class"
         }) {
-          Scope.track(tfr.replace(tfr.find(s), tfr.vec(s).toEnum())._key);
+          Scope.track(tfr.replace(tfr.find(s), tfr.vec(s).toCategorical())._key);
         }
         DKV.put(tfr);
         DeepLearningParameters parms = new DeepLearningParameters();
@@ -904,18 +912,19 @@ public class DeepLearningTest extends TestUtil {
 
         ModelMetricsRegression mm = (ModelMetricsRegression)dl._output._training_metrics;
 
-        if (loss == DeepLearningParameters.Loss.Automatic || loss == DeepLearningParameters.Loss.MeanSquare)
+        if (loss == DeepLearningParameters.Loss.Automatic || loss == DeepLearningParameters.Loss.Quadratic)
           Assert.assertEquals(mm._mean_residual_deviance, mm._MSE, 1e-6);
         else
           assertTrue(mm._mean_residual_deviance != mm._MSE);
 
-        assertTrue(dl.testJavaScoring(tfr, dl.score(tfr), 1e-5));
+        assertTrue(dl.testJavaScoring(tfr, fr2=dl.score(tfr), 1e-5));
 
         job.remove();
       } finally {
         if (tfr != null) tfr.remove();
         if (vfr != null) vfr.remove();
         if (dl != null) dl.delete();
+        if (fr2 != null) fr2.remove();
         Scope.exit();
       }
     }
@@ -923,7 +932,7 @@ public class DeepLearningTest extends TestUtil {
 
   @Test
   public void testDistributions() {
-    Frame tfr = null, vfr = null;
+    Frame tfr = null, vfr = null, fr2 = null;
     DeepLearningModel dl = null;
 
     for (Distribution.Family dist : new Distribution.Family[] {
@@ -939,7 +948,7 @@ public class DeepLearningTest extends TestUtil {
         for (String s : new String[]{
             "Merit", "Class"
         }) {
-          Scope.track(tfr.replace(tfr.find(s), tfr.vec(s).toEnum())._key);
+          Scope.track(tfr.replace(tfr.find(s), tfr.vec(s).toCategorical())._key);
         }
         DKV.put(tfr);
         DeepLearningParameters parms = new DeepLearningParameters();
@@ -962,13 +971,14 @@ public class DeepLearningTest extends TestUtil {
         else
           assertTrue(mm._mean_residual_deviance != mm._MSE);
 
-        assertTrue(dl.testJavaScoring(tfr, dl.score(tfr), 1e-5));
+        assertTrue(dl.testJavaScoring(tfr, fr2=dl.score(tfr), 1e-5));
 
         job.remove();
       } finally {
         if (tfr != null) tfr.remove();
         if (vfr != null) vfr.remove();
         if (dl != null) dl.delete();
+        if (fr2 != null) fr2.delete();
         Scope.exit();
       }
     }
@@ -976,7 +986,7 @@ public class DeepLearningTest extends TestUtil {
 
   @Test
   public void testAutoEncoder() {
-    Frame tfr = null, vfr = null;
+    Frame tfr = null, vfr = null, fr2 = null;
     DeepLearningModel dl = null;
 
     Scope.enter();
@@ -985,7 +995,7 @@ public class DeepLearningTest extends TestUtil {
       for (String s : new String[]{
           "Merit", "Class"
       }) {
-        Scope.track(tfr.replace(tfr.find(s), tfr.vec(s).toEnum())._key);
+        Scope.track(tfr.replace(tfr.find(s), tfr.vec(s).toCategorical())._key);
       }
       DKV.put(tfr);
       DeepLearningParameters parms = new DeepLearningParameters();
@@ -1006,13 +1016,14 @@ public class DeepLearningTest extends TestUtil {
       ModelMetricsAutoEncoder mm = (ModelMetricsAutoEncoder)dl._output._training_metrics;
       Assert.assertEquals(0.0712931422088762, mm._MSE, 1e-2);
 
-      assertTrue(dl.testJavaScoring(tfr, dl.score(tfr), 1e-5));
+      assertTrue(dl.testJavaScoring(tfr, fr2=dl.score(tfr), 1e-5));
 
       job.remove();
     } finally {
       if (tfr != null) tfr.remove();
       if (vfr != null) vfr.remove();
       if (dl != null) dl.delete();
+      if (fr2 != null) fr2.delete();
       Scope.exit();
     }
   }
@@ -1031,7 +1042,7 @@ public class DeepLearningTest extends TestUtil {
         for (String s : new String[]{
             "Class"
         }) {
-          Vec resp = tfr.vec(s).toEnum();
+          Vec resp = tfr.vec(s).toCategorical();
           tfr.remove(s).remove();
           tfr.add(s, resp);
           DKV.put(tfr);
@@ -1081,7 +1092,7 @@ public class DeepLearningTest extends TestUtil {
       for (String s : new String[]{
               "Class"
       }) {
-        Vec resp = tfr.vec(s).toEnum();
+        Vec resp = tfr.vec(s).toCategorical();
         tfr.remove(s).remove();
         tfr.add(s, resp);
         DKV.put(tfr);

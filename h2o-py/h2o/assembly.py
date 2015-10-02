@@ -1,14 +1,13 @@
 from collections import namedtuple
 import uuid, urllib2
-from h2o import H2OConnection, _quoted, get_frame
+from h2o import H2OConnection, _quoted, get_frame, H2OFrame
 
 
 class H2OAssembly:
-  """
-  Extension class of Pipeline implementing additional methods:
+  """Extension class of Pipeline implementing additional methods:
 
     * to_pojo: Exports the assembly to a self-contained Java POJO used in a per-row, high-throughput environment.
-    * fuse: Combine two H2OAssembly objects, the resulting row from each H2OAssembly are joined with simple concatenation.
+    * union: Combine two H2OAssembly objects, the resulting row from each H2OAssembly are joined with simple concatenation.
   """
   def __init__(self, steps):
     """
@@ -57,8 +56,37 @@ class H2OAssembly:
     res = []
     for step in self.steps:
       res.append(step[1].to_rest(step[0]))
-    res = ",".join([_quoted(r.replace('"',"'")) for r in res])
-    res = "[" + res + "]"
+    res = "[" + ",".join([_quoted(r.replace('"',"'")) for r in res]) + "]"
     j = H2OConnection.post_json(url_suffix="Assembly", steps=res, frame=fr._id, _rest_version=99)
     self.id = j["assembly"]["name"]
     return get_frame(j["result"]["name"])
+
+  @property
+  def divide(self): return H2OFrame.__div__
+
+  @property
+  def plus(self): return H2OFrame.__add__
+
+  @property
+  def multiply(self): return H2OFrame.__mul__
+
+  @property
+  def minus(self): return H2OFrame.__sub__
+
+  @property
+  def less_than(self): return H2OFrame.__lt__
+
+  @property
+  def less_than_equal(self): return H2OFrame.__le__
+
+  @property
+  def equal_equal(self): return H2OFrame.__eq__
+
+  @property
+  def not_equal(self): return H2OFrame.__ne__
+
+  @property
+  def greater_than(self): return H2OFrame.__gt__
+
+  @property
+  def greater_than_equal(self): return H2OFrame.__ge__

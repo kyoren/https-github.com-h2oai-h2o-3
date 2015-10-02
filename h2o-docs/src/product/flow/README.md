@@ -462,9 +462,9 @@ The available options vary depending on the selected model. If an option is only
 
 - **min\_rows**: ([GBM](#GBM), [DRF](#DRF)) Specify the minimum number of observations for a leaf ("nodesize" in R). 
 
-- **nbins**: ([GBM](#GBM), [DRF](#DRF)) (Numerical/real/int only) Specify the number of bins for the histogram to build, then split at the best point.   
+- **nbins**: ([GBM](#GBM), [DRF](#DRF)) (Numerical [real/int] only) Specify the minimum number of bins for the histogram to build, then split at the best point.   
 
-- **nbins_cats**: ([GBM](#GBM), [DRF](#DRF)) (Categorical/enums only) Specify the number of bins for the histogram to build, then split at the best point. Higher values can lead to more overfitting.  
+- **nbins_cats**: ([GBM](#GBM), [DRF](#DRF)) (Categorical [factors/enums] only) Specify the maximum number of bins for the histogram to build, then split at the best point. Higher values can lead to more overfitting.  
 
 - **learn_rate**: ([GBM](#GBM)) Specify the learning rate. The range is 0.0 to 1.0. 
 
@@ -525,7 +525,7 @@ The available options vary depending on the selected model. If an option is only
 - **weights_column**: ([GLM](#GLM), [DL](#DL), [DRF](#DRF), [GBM](#GBM)) Select a column to use for the observation weights. The specified `weights_column` must be included in the specified `training_frame`. *Python only*: To use a weights column when passing an H2OFrame to `x` instead of a list of column names, the specified `training_frame` must contain the specified `weights_column`. 
 	>*Note*: Weights are per-row observation weights. This is typically the number of times a row is repeated, but non-integer values are supported as well. During training, rows with higher weights matter more, due to the larger loss function pre-factor.  
 
-- **loss**: ([DL](#DL)) Select the loss function. For DL, the options are Automatic, MeanSquare, CrossEntropy, Huber, or Absolute and the default value is Automatic. Absolute, MeanSquare, and Huber are applicable for regression or classification, while CrossEntropy is only applicable for classification. Huber can improve for regression problems with outliers.
+- **loss**: ([DL](#DL)) Select the loss function. For DL, the options are Automatic, Quadratic, CrossEntropy, Huber, or Absolute and the default value is Automatic. Absolute, Quadratic, and Huber are applicable for regression or classification, while CrossEntropy is only applicable for classification. Huber can improve for regression problems with outliers.
 
 - **checkpoint**: ([DL](#DL), [DRF](#DRF), [GBM](#GBM)) Enter a model key associated with a previously-trained model. Use this option to build a new model as a continuation of a previously-generated model.
 
@@ -638,7 +638,7 @@ The available options vary depending on the selected model. If an option is only
 
 - **max\_after\_balance\_size**: ([DRF](#DRF), [GBM](#GBM), [DL](#DL)) Specify the maximum relative size of the training data after balancing class counts (can be less than 1.0). Requires **balance\_classes**. 
 
-- **nbins\_top\_level**: ([DRF](#DRF), [GBM](#GBM)) (For numerical/real/int columns only) Specify the minimum number of bins at the root level to use to build the histogram. This number will then be decreased by a factor of two per level.  
+- **nbins\_top\_level**: ([DRF](#DRF), [GBM](#GBM)) (For numerical [real/int] columns only) Specify the maximum number of bins at the root level to use to build the histogram. This number will then be decreased by a factor of two per level.  
 
 - **seed**: ([K-Means](#Kmeans), [GBM](#GBM), [DL](#DL), [DRF](#DRF)) Specify the random number generator (RNG) seed for algorithm components dependent on randomization. The seed is consistent for each H2O instance so that you can create models with the same starting conditions in alternative configurations. 
 

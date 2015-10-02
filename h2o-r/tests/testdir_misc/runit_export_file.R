@@ -24,13 +24,13 @@ test.export.file <- function() {
   h2o.exportFile(mypred, dname)
 
   Log.info("Comparing file with R...")
-  R.pred <- read.csv(dname)
+  R.pred <- read.csv(dname, colClasses=c("factor",NA,NA))
   print(head(R.pred))
   H.pred <- as.data.frame(mypred)
   print(head(H.pred))
   expect_identical(R.pred, H.pred)
 
-  testEnd()
+  
 }
 
 doTest("Testing Exporting Files", test.export.file)

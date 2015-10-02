@@ -26,8 +26,8 @@ import water.codegen.CodeGenerator;
 import water.codegen.CodeGeneratorPipeline;
 import water.exceptions.JCodeSB;
 import water.fvec.C0DChunk;
+import water.fvec.CategoricalWrappedVec;
 import water.fvec.Chunk;
-import water.fvec.EnumWrappedVec;
 import water.fvec.Frame;
 import water.fvec.NewChunk;
 import water.fvec.Vec;
@@ -45,7 +45,7 @@ import static hex.ModelMetricsMultinomial.getHitRatioTable;
  * A Model models reality (hopefully).
  * A model can be used to 'score' a row (make a prediction), or a collection of
  * rows on any compatible dataset - meaning the row has all the columns with the
- * same names as used to build the mode and any enum (categorical) columns can
+ * same names as used to build the mode and any categorical columns can
  * be adapted.
  */
 public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, O extends Model.Output> extends Lockable<M> {
@@ -298,7 +298,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
     }
 
     /** Any final prep-work just before model-building starts, but after the
-     *  user has clicked "go".  E.g., converting a response column to an enum
+     *  user has clicked "go".  E.g., converting a response column to an categorical
      *  touches the entire column (can be expensive), makes a parallel vec
      *  (Key/Data leak management issues), and might throw IAE if there are too
      *  many classes. */
@@ -327,14 +327,14 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
       return _names.length - (_hasOffset?1:0)  - (_hasWeights?1:0) - (_hasFold?1:0) - (isSupervised()?1:0);
     }
 
-    /** Categorical/factor/enum mappings, per column.  Null for non-enum cols.
+    /** Categorical/factor mappings, per column.  Null for non-categorical cols.
      *  Columns match the post-init cleanup columns.  The last column holds the
-     *  response col enums for SupervisedModels.  */
+     *  response col categoricals for SupervisedModels.  */
     public String _domains[][];
 
     /** List of all the associated ModelMetrics objects, so we can delete them
      *  when we delete this model. */
-    public Key[] _model_metrics = new Key[0];
+    Key[] _model_metrics = new Key[0];
 
     /** Job state (CANCELLED, FAILED, DONE).  TODO: Really the whole Job
      *  (run-time, etc) but that has to wait until Job is split from
@@ -403,7 +403,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
       return _names.length-1;
     }
 
-    /** The names of the levels for an enum (categorical) response column. */
+    /** The names of the levels for an categorical response column. */
     public String[] classNames() { assert isSupervised();
       return _domains[_domains.length-1];
     }
@@ -434,6 +434,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
       _model_metrics[_model_metrics.length - 1] = mm._key;
       return mm;                // Flow coding
     }
+    public synchronized void clearModelMetrics() { _model_metrics = new Key[0]; }
 
     long checksum_impl() {
       return (null == _names ? 13 : Arrays.hashCode(_names)) *
@@ -519,7 +520,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
    *  The {@code test} frame is updated in-place to be compatible, by altering
    *  the names and Vecs; make a defensive copy if you do not want it modified.
    *  There is a fast-path cutout if the test set is already compatible.  Since
-   *  the test-set is conditionally modifed with extra EnumWrappedVec optionally
+   *  the test-set is conditionally modifed with extra CategoricalWrappedVec optionally
    *  added it is recommended to use a Scope enter/exit to track Vec lifetimes.
    *
    *  @param test Testing Frame, updated in-place
@@ -536,7 +537,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
   }
   /**
    * @param names Training column names
-   *  @param weights  Name of column with observation weights, weights are NOT filled in if missing in test frame
+   * @param weights  Name of column with observation weights, weights are NOT filled in if missing in test frame
    * @param offset   Name of column with offset, if not null (i.e. trained with offset), offset MUST be present in test data as well, otherwise can not scorew and IAE is thrown.
    * @param fold
    * @param response Name of response column,  response is NOT filled in if missing in test frame
@@ -554,7 +555,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
       return new String[0];
 
     // Build the validation set to be compatible with the training set.
-    // Toss out extra columns, complain about missing ones, remap enums
+    // Toss out extra columns, complain about missing ones, remap categoricals
     ArrayList<String> msgs = new ArrayList<>();
     Vec vvecs[] = new Vec[names.length];
     int good = 0;               // Any matching column names, at all?
@@ -571,7 +572,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
         throw new IllegalArgumentException("Test/Validation dataset is missing response vector '" + response + "'");
       if(vec == null && isOffset)
         throw new IllegalArgumentException("Test/Validation dataset is missing offset vector '" + offset + "'");
-      if(vec == null && isWeights && computeMetrics) {
+      if(vec == null && isWeights && computeMetrics && expensive) {
         vec = test.anyVec().makeCon(1);
         msgs.add(H2O.technote(1, "Test/Validation dataset is missing the weights column '" + names[i] + "' (needed because a response was found and metrics are to be computed): substituting in a column of 1s"));
         //throw new IllegalArgumentException(H2O.technote(1, "Test dataset is missing weights vector '" + weights + "' (needed because a response was found and metrics are to be computed)."));
@@ -594,11 +595,11 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
         msgs.add(str);
       }
       if( vec != null ) {          // I have a column with a matching name
-        if( domains[i] != null ) { // Model expects an enum
-          if( vec.domain() != domains[i] && !Arrays.equals(vec.domain(),domains[i]) ) { // Result needs to be the same enum
-            EnumWrappedVec evec;
+        if( domains[i] != null ) { // Model expects an categorical
+          if( vec.domain() != domains[i] && !Arrays.equals(vec.domain(),domains[i]) ) { // Result needs to be the same categorical
+            CategoricalWrappedVec evec;
             try {
-              evec = vec.adaptTo(domains[i]); // Convert to enum or throw IAE
+              evec = vec.adaptTo(domains[i]); // Convert to categorical or throw IAE
             } catch( NumberFormatException nfe ) {
               throw new IllegalArgumentException("Test/Validation dataset has a non-categorical column '"+names[i]+"' which is categorical in the training data");
             }
@@ -613,7 +614,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
           } else {
             good++;
           }
-        } else if( vec.isEnum() ) {
+        } else if( vec.isCategorical() ) {
           throw new IllegalArgumentException("Test/Validation dataset has categorical column '"+names[i]+"' which is real-valued in the training data");
         } else {
           good++;      // Assumed compatible; not checking e.g. Strings vs UUID
@@ -667,7 +668,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
     // Output is in the model's domain, but needs to be mapped to the scored
     // dataset's domain.
     if(_output.isClassifier() && computeMetrics) {
-//      assert(mdomain != null); // label must be enum
+//      assert(mdomain != null); // label must be categorical
       ModelMetrics mm = ModelMetrics.getFromDKV(this,fr);
       ConfusionMatrix cm = mm.cm();
       if (cm != null && cm._domain != null) //don't print table for regression
@@ -681,7 +682,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
       if( actual != null ) {  // Predict does not have an actual, scoring does
         String sdomain[] = actual.domain(); // Scored/test domain; can be null
         if (sdomain != null && mdomain != sdomain && !Arrays.equals(mdomain, sdomain))
-          output.replace(0, new EnumWrappedVec(actual.group().addVec(), actual.get_espc(), sdomain, predicted._key));
+          output.replace(0, new CategoricalWrappedVec(actual.group().addVec(), actual.get_espc(), sdomain, predicted._key));
       }
     }
 
@@ -1093,8 +1094,8 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
         String sdomain[] = actual == null ? null : actual.domain(); // Scored/test domain; can be null
         String mdomain[] = model_predictions.vec(0).domain(); // Domain of predictions (union of test and train)
         if( sdomain != null && mdomain != sdomain && !Arrays.equals(mdomain, sdomain)) {
-          EnumWrappedVec ewv = new EnumWrappedVec(mdomain,sdomain);
-          omap = ewv.enum_map(); // Map from model-domain to scoring-domain
+          CategoricalWrappedVec ewv = new CategoricalWrappedVec(mdomain,sdomain);
+          omap = ewv.getDomainMap(); // Map from model-domain to scoring-domain
           ewv.remove();
         }
       }
@@ -1125,7 +1126,7 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
         genmodel.score0(features,predictions);            // POJO predictions
         for( int col=0; col<pvecs.length; col++ ) { // Compare predictions
           double d = pvecs[col].at(row);                  // Load internal scoring predictions
-          if( col==0 && omap != null ) d = omap[(int)d];  // map enum response to scoring domain
+          if( col==0 && omap != null ) d = omap[(int)d];  // map categorical response to scoring domain
           if( !MathUtils.compare(predictions[col],d,1e-15,rel_epsilon) ) {
             if (miss++ < 10)
               System.err.println("Predictions mismatch, row "+row+", col "+model_predictions._names[col]+", internal prediction="+d+", POJO prediction="+predictions[col]);
@@ -1149,11 +1150,10 @@ public abstract class Model<M extends Model<M,P,O>, P extends Model.Parameters, 
 
   @Override
   public void delete() {
-    deleteCrossValidationModels();
     super.delete();
   }
 
-  private void deleteCrossValidationModels( ) {
+  public void deleteCrossValidationModels( ) {
     if (_output._cross_validation_models != null) {
       for (Key k : _output._cross_validation_models) {
         Model m = DKV.getGet(k);

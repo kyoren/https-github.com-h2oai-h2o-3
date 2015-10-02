@@ -96,7 +96,9 @@ abstract public class AST extends Iced<AST> {
     init(new ASTAnd ());
     init(new ASTDiv ());
     init(new ASTIntDiv());
+    init(new ASTIntDivR());
     init(new ASTMod ());
+    init(new ASTModR());
     init(new ASTMul ());
     init(new ASTOr  ());
     init(new ASTPlus());
@@ -168,7 +170,7 @@ abstract public class AST extends Iced<AST> {
     // Generic data mungers
     init(new ASTAnyFactor());
     init(new ASTAsFactor());
-    init(new ASTCharacter());
+    init(new ASTAsCharacter());
     init(new ASTAsNumeric());
     init(new ASTCBind());
     init(new ASTColNames());
@@ -264,7 +266,7 @@ class ASTFrame extends AST {
 /** A Row.  Execution is just to return the constant. */
 class ASTRow extends AST {
   final ValRow _row;
-  ASTRow(double[] ds) { _row = new ValRow(ds); }
+  ASTRow(double[] ds, String[] names) { _row = new ValRow(ds,names); }
   @Override public String str() { return _row.toString(); }
   @Override public ValRow exec(Env env) { return _row; }
   @Override int nargs() { return 1; }

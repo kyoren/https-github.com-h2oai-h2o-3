@@ -48,16 +48,16 @@ public class DeepLearningProstateTest extends TestUtil {
       try {
         for (int resp : responses[i]) {
           boolean classification = !(i == 0 && resp == 2);
-          if (classification && !frame.vec(resp).isEnum()) {
+          if (classification && !frame.vec(resp).isCategorical()) {
             DKV.remove(frame._key);
             String respname = frame.name(resp);
-            Vec r = frame.vec(respname).toEnum();
+            Vec r = frame.vec(respname).toCategorical();
             frame.remove(respname).remove();
             frame.add(respname, r);
             DKV.put(frame);
 
             DKV.remove(vframe._key);
-            Vec vr = vframe.vec(respname).toEnum();
+            Vec vr = vframe.vec(respname).toCategorical();
             vframe.remove(respname).remove();
             vframe.add(respname, vr);
             DKV.put(vframe);
@@ -67,7 +67,7 @@ public class DeepLearningProstateTest extends TestUtil {
                   DeepLearningParameters.Loss.CrossEntropy,
                   DeepLearningParameters.Loss.Huber,
                   DeepLearningParameters.Loss.Absolute,
-                  DeepLearningParameters.Loss.MeanSquare
+                  DeepLearningParameters.Loss.Quadratic
           }) {
             if ( !classification && loss == DeepLearningParameters.Loss.CrossEntropy ) continue;
             for (Distribution.Family dist : new Distribution.Family[]{
@@ -408,8 +408,14 @@ public class DeepLearningProstateTest extends TestUtil {
                                           t.printStackTrace();
                                           throw new RuntimeException(t);
                                         } finally {
-                                          if (model1 != null) model1.delete();
-                                          if (model2 != null) model2.delete();
+                                          if (model1 != null) {
+                                            model1.deleteCrossValidationModels();
+                                            model1.delete();
+                                          }
+                                          if (model2 != null) {
+                                            model2.deleteCrossValidationModels();
+                                            model2.delete();
+                                          }
                                         }
                                       }
                                     }
